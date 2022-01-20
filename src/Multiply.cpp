@@ -127,9 +127,8 @@ public:
 		createInfo.size = inputDataSize();
 		createInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 		createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		createInfo.queueFamilyIndexCount = 1;
-		createInfo.pQueueFamilyIndices = &computeTransferQueueFamilyIndex.value();
-		createInfo.pNext = nullptr;
+		createInfo.queueFamilyIndexCount = 0;
+		createInfo.pQueueFamilyIndices = nullptr;
 		if (vkCreateBuffer(device, &createInfo, nullptr, &storageBuffer) != VK_SUCCESS)
 			throw std::runtime_error("failed to create storage buffer!");
 
@@ -171,7 +170,6 @@ public:
 	}
 
 	VkDescriptorSetLayout descriptorSetLayout;
-
 	void createDescriptorSetLayout()
 	{
 		VkDescriptorSetLayoutBinding binding;
@@ -292,7 +290,7 @@ public:
 		std::cout << "input data:\n";
 		for (size_t i = 0; i < inputData.size(); ++i)
 		{
-			if (i % 32 == 0 && i != 0) std::cout << '\n';
+			if (i % 64 == 0 && i != 0) std::cout << '\n';
 			std::cout << inputData[i];
 		}
 		std::cout << "\n";
@@ -310,7 +308,7 @@ public:
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
 			0, 1, &descriptorSet, 0, nullptr);
 		vkCmdDispatch(commandBuffer, 
-			static_cast<uint32_t>(inputData.size()) / computeShaderProcessUnit(), //x
+			static_cast<uint32_t>(inputData.size() / computeShaderProcessUnit()), //x
 			1, //y
 			1  //z
 		);
@@ -334,7 +332,7 @@ public:
 		std::cout << "output data:\n";
 		for (size_t i = 0; i < outputData.size(); ++i)
 		{
-			if (i % 32 == 0 && i != 0) std::cout << '\n';
+			if (i % 64 == 0 && i != 0) std::cout << '\n';
 			std::cout << outputData[i];
 		}
 	}

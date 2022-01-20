@@ -146,7 +146,6 @@ public:
 	}
 
 	VkDescriptorSetLayout descriptorSetLayout;
-
 	void createDescriptorSetLayout()
 	{
 
@@ -191,7 +190,24 @@ public:
 	VkCommandBuffer commandBuffer;
 	void execute()
 	{
+		std::cout << "input data:\n";
+		for (size_t i = 0; i < inputData.size(); ++i)
+		{
+			if (i % 64 == 0 && i != 0) std::cout << '\n';
+			std::cout << inputData[i];
+		}
+		std::cout << "\n";
 
+
+		// execute
+
+
+		std::cout << "output data:\n";
+		for (size_t i = 0; i < outputData.size(); ++i)
+		{
+			if (i % 64 == 0 && i != 0) std::cout << '\n';
+			std::cout << outputData[i];
+		}
 	}
 
 	void Run()
