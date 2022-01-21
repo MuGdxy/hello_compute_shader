@@ -26,6 +26,17 @@ add_executable(
     ${MuVkHeaders}
 )
 
+add_executable(
+    ViewID
+    "src/ViewID.cpp"
+    ${MuVkHeaders}
+)
+
+add_executable(
+    Atom
+    "src/Atom.cpp"
+    ${MuVkHeaders}
+)
 #link_libraries(HelloComputeShader vulkan-1.lib)
 
 
