@@ -62,6 +62,14 @@ namespace MuVk
 			return memoryProperties;
 		}
 
+		static std::vector<VkExtensionProperties> DeviceExtensionProperties(VkPhysicalDevice device, const char* pLayerName)
+		{
+			uint32_t count;
+			vkEnumerateDeviceExtensionProperties(device, pLayerName, &count, nullptr);
+			std::vector<VkExtensionProperties> ret(count);
+			vkEnumerateDeviceExtensionProperties(device, pLayerName, &count, ret.data());
+			return ret;
+		}
 	};
 }
 
@@ -77,15 +85,32 @@ static struct tabs
 	}
 };
 
+inline std::ostream& Version(std::ostream& o, uint32_t version)
+{
+	o << VK_API_VERSION_VARIANT(version) << '.'
+		<< VK_API_VERSION_MAJOR(version) << '.'
+		<< VK_API_VERSION_MINOR(version) << '.'
+		<< VK_API_VERSION_PATCH(version);
+	return o;
+}
+
+inline std::ostream& operator << (std::ostream& o, const VkExtensionProperties& extension)
+{
+	o << "\n" << extension.extensionName
+		<< "<Version="; 
+	Version(o, extension.specVersion) << ">";
+	return o;
+}
+
 inline std::ostream& operator << (std::ostream& o, const std::vector<VkExtensionProperties>& properties)
 {
 	o << "available extensions:";
 	tabs t(1);
 	for (const auto& extension : properties)
 	{
-		std::cout
-			<< "\n"<< t << extension.extensionName
-			<< "<Version=" << extension.specVersion << ">";
+		o << "\n" << t << extension.extensionName
+			<< "<Version=";
+		Version(o, extension.specVersion) << ">";
 	}
 	return o;
 }

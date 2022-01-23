@@ -80,6 +80,7 @@ public:
 				{
 					computeTransferQueueFamilyIndex = i;
 					physicalDevice = device;
+					break;
 				}
 			}
 		}
@@ -88,6 +89,7 @@ public:
 		else
 		{
 			std::cout << "Select Physical Device:" << physicalDevice << std::endl;
+			std::cout << MuVk::Query::DeviceExtensionProperties(physicalDevice, nullptr) << std::endl;
 			std::cout << "Select Queue Index:" << computeTransferQueueFamilyIndex.value() << std::endl;
 		}
 	}
