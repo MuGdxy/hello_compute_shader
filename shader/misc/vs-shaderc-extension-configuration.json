@@ -1,0 +1,5 @@
+{
+    "shaderc-lint.glslcArgs": "--target-env=vulkan1.0",
+    "shaderc-lint.defaultGLSLVersion": "450",
+    "shaderc-lint.buildOnSave": true
+}

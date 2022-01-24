@@ -85,8 +85,10 @@ public:
 				{
 					computeTransferQueueFamilyIndex = i;
 					physicalDevice = device;
+					break;
 				}
 			}
+			if (computeTransferQueueFamilyIndex.has_value()) break;
 		}
 		if (!computeTransferQueueFamilyIndex.has_value())
 			throw std::runtime_error("can't find a family that contains compute&transfer queue!");

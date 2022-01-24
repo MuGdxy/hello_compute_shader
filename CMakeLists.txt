@@ -12,8 +12,12 @@ foreach(MuVkHeader ${MuVkHeaders})
     message(${MuVkHeader})
 endforeach()
 
+include_directories(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+)
+
 add_definitions(-DMU_SHADER_PATH="${CMAKE_SOURCE_DIR}/shader/")
-link_libraries(vulkan-1.lib)
+link_libraries("vulkan-1.lib")
 add_executable(
     MultiplyComputeShader
     "src/Multiply.cpp"
@@ -33,11 +37,17 @@ add_executable(
 )
 
 add_executable(
-    Atom
-    "src/Atom.cpp"
+    PhysicalDeviceProperties
+    "src/PhysicalDeviceProperties.cpp"
     ${MuVkHeaders}
 )
-#link_libraries(HelloComputeShader vulkan-1.lib)
+
+add_executable(
+    ComputeShaderRayTracing
+    "src/ComputeShaderRayTracing/main.cpp"
+    ${MuVkHeaders}
+)
+
 
 
 
