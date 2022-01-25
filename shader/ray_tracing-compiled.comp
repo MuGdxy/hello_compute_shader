@@ -1,10 +1,9 @@
 #version 450
+#define GLSLIFY 1
 
 const int blockSizeX = 32;
 const int blockSizeY = 32;
 layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
-
-
 
 /*Start: Random*/
 uint state;
@@ -63,7 +62,6 @@ vec3 RayColor(Ray r) {
 }
 /*End: Ray*/
 
-
 /*Start: Sphere*/
 struct Sphere
 {
@@ -81,7 +79,6 @@ float HitSphere(Sphere s, Ray r)
     return discriminant < 0 ? -1.0 : (-b - sqrt(discriminant) ) / (2.0*a);
 }
 /*End: Sphere*/
-
 
 /*Start: Camera*/
 struct Camera
