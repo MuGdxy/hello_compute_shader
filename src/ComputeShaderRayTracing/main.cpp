@@ -16,16 +16,7 @@ public:
 	size_t width;
 	size_t height;
 	TargetBuffer() {};
-	void RestructureFromDamp()
-	{
-		for (size_t y = 0; y < height; ++y)
-			for (size_t x = 0; x < width; ++x)
-			{
-				write_color(x, y, glm::vec3(damp[y * width + x]));
-				//std::cout << damp[y * width + x].x << "," << damp[y * width + x].y << std::endl;
-			}
-				
-	}
+	
 	TargetBuffer(size_t width, size_t height, int samples_per_pixel)
 		:width(width), height(height), samples_per_pixel(samples_per_pixel)
 	{
@@ -34,6 +25,12 @@ public:
 			buf[i].resize(width);
 		damp.resize(width * height, glm::vec4(0));
 	}
+	void RestructureFromDamp()
+	{
+		for (size_t y = 0; y < height; ++y)
+			for (size_t x = 0; x < width; ++x)
+				write_color(x, y, glm::vec3(damp[y * width + x]));
+	}
 	void write_color(size_t x, size_t y, glm::vec3 pixel_color)
 	{
 		x -= offset.x;
@@ -41,20 +38,12 @@ public:
 		auto r = pixel_color.x;
 		auto g = pixel_color.y;
 		auto b = pixel_color.z;
-
-		// Divide the color by the number of samples.
-		auto scale = 1.0 / samples_per_pixel;
-		r = std::sqrt(scale * r);
-		g = std::sqrt(scale * g);
-		b = std::sqrt(scale * b);
-
 		buf[y][x] = glm::ivec3
 		{
 			256 * glm::clamp(r, 0.0f, 0.999f),
 			256 * glm::clamp(g, 0.0f, 0.999f),
 			256 * glm::clamp(b, 0.0f, 0.999f)
 		};
-		//buf[y][x] = pixel_color;
 	}
 	void write(TargetBuffer& sub_buf)
 	{
