@@ -1,0 +1,158 @@
+#version 450
+#define GLSLIFY 1
+
+const int blockSizeX = 32;
+const int blockSizeY = 32;
+layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
+
+/*Start: Random*/
+uint state;
+
+uint xor_shift_rand()
+{
+    state ^= (state << 13);
+    state ^= (state >> 17);
+    state ^= (state << 5);
+    return state;
+}
+
+void SetUpRandom(vec2 screenCoord, vec2 screenSize)
+{
+	state = uint(screenCoord.x * screenSize.x 
+        + screenCoord.y * screenSize.x * screenSize.y);
+}
+
+float Rand()
+{
+	return float(xor_shift_rand()) * (1.0 / 4294967296.0);
+}
+
+vec2 RandVec2()
+{
+    return vec2(Rand(),Rand());
+}
+
+vec3 RandVec3()
+{
+    return vec3(RandVec2(),Rand());
+}
+/*End: Random*/
+
+/*Start: Ray*/
+struct Ray
+{
+    vec3 origin;
+    vec3 direction;
+};
+
+Ray InitRay(vec3 origin, vec3 direction)
+{
+    Ray r;
+    r.origin = origin;
+    r.direction = normalize(direction);
+    return r;
+}
+
+vec3 At(Ray r, float t) { return r.origin + r.direction * t; }
+
+vec3 RayColor(Ray r) {
+    vec3 dir = r.direction;
+    float t = 0.5*(dir.y + 1.0);
+    return mix(vec3(1.0,1.0,1.0),vec3(0.5, 0.7, 1.0), t);
+}
+/*End: Ray*/
+
+/*Start: Sphere*/
+struct Sphere
+{
+    vec3 center;
+    float radius;
+};
+
+float HitSphere(Sphere s, Ray r)
+{
+    vec3 oc = r.origin - s.center;
+    float a = dot(r.direction, r.direction);
+    float b = 2.0 * dot(oc, r.direction);
+    float c = dot(oc, oc) - s.radius * s.radius;
+    float discriminant = b*b - 4*a*c;
+    return discriminant < 0 ? -1.0 : (-b - sqrt(discriminant) ) / (2.0*a);
+}
+/*End: Sphere*/
+
+/*Start: Camera*/
+struct Camera
+{
+    //:0
+    vec3 origin;
+    vec3 horizontal;
+    vec3 vertical;
+    vec3 lowerLeftCorner;
+    //:4
+    float viewportHeight;
+    float viewportWidth;
+    float aspectRatio;
+    float focalLength;
+};
+/*End: Camera*/
+
+layout(push_constant) uniform PushConstant 
+{
+    ivec2 screenSize;
+};
+
+layout(set = 0, binding = 0) buffer TargetBuffer
+{
+    vec4 pixels[];
+} target;
+
+layout(set = 0, binding = 1, std140) uniform CameraBuffer
+{
+    Camera camera;
+};
+
+void WriteColor(int x, int y, vec3 color)
+{
+    target.pixels[y * screenSize.x + x] = vec4(color,1.0);
+}
+
+// layout(set = 1, binding = 0, std140) readonly buffer GeometryBuffer
+// {
+//    Sphere spheres[];
+// };
+
+void main()
+{
+    //hard code sphere
+    Sphere s;
+    s.center = vec3(0,0,-1);
+    s.radius = 0.5;
+
+    if(gl_GlobalInvocationID.x >= screenSize.x
+        || gl_GlobalInvocationID.y >= screenSize.y) return;
+    int i = int(gl_GlobalInvocationID.x);
+    int j = int(gl_GlobalInvocationID.y);
+
+    const int samples = 100;
+    vec3 color = vec3(0);
+    for(int sam = 0; sam < samples;++sam)
+    {
+        float v = (float(screenSize.y - j - 1) + Rand()) / (screenSize.y - 1);
+        float u = (float(i) + Rand()) / (screenSize.x - 1);
+
+        Ray r = InitRay(camera.origin, 
+            camera.lowerLeftCorner 
+            + u*camera.horizontal
+            + v*camera.vertical
+            - camera.origin);
+        
+        float t = HitSphere(s,r);
+        if (t > 0.0) {
+            vec3 N = normalize(At(r, t) - vec3(0,0,-1));
+            color += 0.5 * vec3(N.x+1, N.y+1, N.z+1);
+        }
+        else color += RayColor(r);
+    }
+    color /= samples;
+    WriteColor(i, j, color);
+}
