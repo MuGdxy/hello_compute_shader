@@ -1,0 +1,14 @@
+#ifndef MU_MATERIAL
+#define MU_MATERIAL
+#include "Ray.comph"
+
+#include "MaterialStructure.comph"
+
+Lambertian lambertians[1];
+
+#include "HitRecordStructure.comph"
+
+bool scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
+
+bool scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
+#endif

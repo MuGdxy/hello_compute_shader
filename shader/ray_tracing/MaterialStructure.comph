@@ -1,0 +1,21 @@
+#ifndef MU_MATERIAL_STRUCT
+#define MU_MATERIAL_STRUCT
+const struct
+{
+    uint None;
+    uint Lambertian;
+    uint Metal;
+    uint Dielectrics;
+} MaterialEnum = {0,1,2,4};
+
+struct Material 
+{ 
+    uint type;
+    uint ptr; 
+};
+
+struct Lambertian
+{ 
+    vec3 albedo; 
+};
+#endif

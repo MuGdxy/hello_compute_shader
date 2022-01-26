@@ -1,0 +1,14 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "Camera.comph"
+
+Ray GetRay(Camera self, float u, float v)
+{
+    Ray r;
+    Init(r, self.origin, 
+        self.lowerLeftCorner 
+        + u*self.horizontal
+        + v*self.vertical
+        - self.origin);
+    return r;
+}

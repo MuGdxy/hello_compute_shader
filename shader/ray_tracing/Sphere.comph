@@ -1,0 +1,16 @@
+#ifndef MU_SPHERE
+#define MU_SPHERE
+#include "Ray.comph"
+#include "HitRecord.comph"
+#include "Material.comph"
+
+struct Sphere
+{
+    vec3    center;
+    float   radius;
+    Material mat;
+};
+
+void Init(inout Sphere self, vec3 center, float radius);
+bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec);
+#endif

@@ -1,0 +1,6 @@
+#ifndef MU_HIT_RECORD
+#define MU_HIT_RECORD
+#include "Ray.comph"
+#include "HitRecordStructure.comph"
+void SetFaceNormal(inout HitRecord self, Ray r, vec3 outwardNormal);
+#endif

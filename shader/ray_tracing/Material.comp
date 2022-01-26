@@ -1,0 +1,22 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "Material.comph"
+#include "Random.comph"
+
+bool scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    switch(self.type)
+    {
+    case MaterialEnum.Lambertian:
+        return scatter(lambertians[self.ptr], r_in, rec, attenuation, scattered);
+    }
+    return false;
+}
+
+bool scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    vec3 scatter_direction = rec.normal + RandVec3();
+    Init(scattered, rec.p, scatter_direction);
+    attenuation = self.albedo;
+    return true;
+}

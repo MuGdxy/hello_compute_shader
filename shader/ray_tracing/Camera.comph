@@ -1,0 +1,19 @@
+#ifndef MU_CAMERA
+#define MU_CAMERA
+#include "Ray.comph"
+struct Camera
+{
+    //:0
+    vec3    origin;
+    vec3    horizontal;
+    vec3    vertical;
+    vec3    lowerLeftCorner;
+    //:4
+    float   viewportHeight;
+    float   viewportWidth;
+    float   aspectRatio;
+    float   focalLength;
+};
+
+Ray GetRay(Camera self, float u, float v);
+#endif

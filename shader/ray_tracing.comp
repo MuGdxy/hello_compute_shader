@@ -1,106 +1,83 @@
 #version 450
-
 const int blockSizeX = 32;
 const int blockSizeY = 32;
 layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
 
+#define Method(x)
+#define implements(x)
 
-
-/*Start: Random*/
 uint state;
-
-uint xor_shift_rand()
+const struct
 {
-    state ^= (state << 13);
-    state ^= (state >> 17);
-    state ^= (state << 5);
-    return state;
-}
+    uint None;
+    uint Lambertian;
+    uint Metal;
+    uint Dielectrics;
+} MaterialEnum = {0,1,2,4};
 
-void SetUpRandom(vec2 screenCoord, vec2 screenSize)
-{
-	state = uint(screenCoord.x * screenSize.x 
-        + screenCoord.y * screenSize.x * screenSize.y);
-}
+struct Material 
+{ 
+    uint type;
+    uint ptr; 
+};
 
-float Rand()
-{
-	return float(xor_shift_rand()) * (1.0 / 4294967296.0);
-}
+struct Lambertian implements(Material) 
+{ 
+    vec3 albedo; 
+};
 
-vec2 RandVec2()
-{
-    return vec2(Rand(),Rand());
-}
-
-vec3 RandVec3()
-{
-    return vec3(RandVec2(),Rand());
-}
-/*End: Random*/
-
-/*Start: Ray*/
 struct Ray
 {
-    vec3 origin;
-    vec3 direction;
+    vec3    origin;
+    vec3    direction;
 };
 
-Ray InitRay(vec3 origin, vec3 direction)
-{
-    Ray r;
-    r.origin = origin;
-    r.direction = normalize(direction);
-    return r;
-}
-
-vec3 RayColor(Ray r) {
-    vec3 dir = r.direction;
-    float t = 0.5*(dir.y + 1.0);
-    return mix(vec3(1.0,1.0,1.0),vec3(0.5, 0.7, 1.0), t);
-}
-/*End: Ray*/
-
-
-/*Start: Sphere*/
 struct Sphere
 {
-    vec3 center;
-    float radius;
+    vec3    center;
+    float   radius;
+    Material mat;
+    //just for test;
+    Lambertian lam;
 };
 
-bool HitSphere(Sphere s, Ray r)
-{
-    vec3 oc = r.origin - s.center;
-    float a = dot(r.direction, r.direction);
-    float b = 2.0 * dot(oc, r.direction);
-    float c = dot(oc, oc) - s.radius * s.radius;
-    float discriminant = b*b - 4*a*c;
-    return (discriminant > 0);
-}
-/*End: Sphere*/
-
-
-/*Start: Camera*/
 struct Camera
 {
     //:0
-    vec3 origin;
-    vec3 horizontal;
-    vec3 vertical;
-    vec3 lowerLeftCorner;
+    vec3    origin;
+    vec3    horizontal;
+    vec3    vertical;
+    vec3    lowerLeftCorner;
     //:4
-    float viewportHeight;
-    float viewportWidth;
-    float aspectRatio;
-    float focalLength;
+    float   viewportHeight;
+    float   viewportWidth;
+    float   aspectRatio;
+    float   focalLength;
 };
-/*End: Camera*/
+
+struct HitRecord 
+{
+    vec3 p;
+    vec3 normal;
+    float t;
+    bool frontFace;
+    Material mat;
+    //just for test;
+    Lambertian lam;
+};
+
+struct World
+{
+    Sphere object[10];
+    int count;
+};
 
 layout(push_constant) uniform PushConstant 
 {
     ivec2 screenSize;
 };
+const int samples = 200;
+const int maxDepth = 800;
 
 layout(set = 0, binding = 0) buffer TargetBuffer
 {
@@ -112,41 +89,299 @@ layout(set = 0, binding = 1, std140) uniform CameraBuffer
     Camera camera;
 };
 
-void WriteColor(int x, int y, vec3 color)
-{
-    target.pixels[y * screenSize.x + x] = vec4(color,1.0);
-}
-
+// layout(set = 1, binding = 0, std140) readonly buffer LambertianBuffer
+// {
+//     Lambertian lambertians[];
+// };
+//just for test;
+Lambertian lambertians[1];
 // layout(set = 1, binding = 0, std140) readonly buffer GeometryBuffer
 // {
 //    Sphere spheres[];
 // };
 
+Method(Random)
+uint xor_shift_rand();
+void Seed(uvec2 screenCoord, uvec2 screenSize);
+float Rand();
+vec2 RandVec2();
+vec3 RandVec3();
+vec3 RandUnitBall();
+vec3 RandSemiUnitBall();
+
+
+Method(Ray)
+void Init(inout Ray self, vec3 origin, vec3 direction);
+vec3 At(Ray self, float t);
+
+
+Method(Shpere)
+void Init(inout Sphere self, vec3 center, float radius);
+bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec);
+
+
+Method(Camera)
+Ray GetRay(Camera self, float u, float v);
+
+
+Method(HitRecord)
+void SetFaceNormal(inout HitRecord self, Ray r, vec3 outwardNormal);
+
+
+Method(World)
+bool Hit(World self, Ray r, float t_min, float t_max, out HitRecord rec);
+
+Method(Material)
+bool scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
+
+Method(Lambertian)
+bool scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
+
+
+Method(GLOBAL)
+vec3 BackgroundColor(Ray r);
+void WriteColor(int x, int y, vec3 color);
+
+
+World world;
+
+void SetupWorld()
+{
+    Material m;
+    m.type = MaterialEnum.Lambertian;
+    m.ptr = 0;
+
+    lambertians[0].albedo = vec3(0.5);
+
+    Init(world.object[0], vec3(0, 0, -1), 0.5);
+    world.object[0].mat = m;
+
+    Init(world.object[1], vec3(0,-100.5,-1), 100);
+    world.object[1].mat = m;
+    world.count = 2;
+}
+
+vec3 RayColor(Ray r, World world)
+{
+    vec3 color = vec3(1.0);
+    Ray next = r;
+    for(int i = 0; i < maxDepth; ++i)
+    {
+        HitRecord rec;
+        if(Hit(world, next, 0.001, 10000, rec))
+        {
+            vec3 attenuation;
+            if(scatter(rec.mat, r, rec, attenuation, next))
+                color *= attenuation;
+            else return vec3(0);
+        }
+        else return color * BackgroundColor(next);
+    }
+    return vec3(0);
+}
+
+
 void main()
 {
-    //hard code sphere
-    Sphere s;
-    s.center = vec3(0,0,-1);
-    s.radius = 0.5;
+    Seed(gl_GlobalInvocationID.xy, screenSize);
+
+    SetupWorld();
 
     if(gl_GlobalInvocationID.x >= screenSize.x
         || gl_GlobalInvocationID.y >= screenSize.y) return;
     int i = int(gl_GlobalInvocationID.x);
     int j = int(gl_GlobalInvocationID.y);
 
-    const int samples = 100;
     vec3 color = vec3(0);
-    for(int sam = 0; sam < samples;++sam)
+
+    for(int sam = 0; sam < samples; ++sam)
     {
         float v = (float(screenSize.y - j - 1) + Rand()) / (screenSize.y - 1);
         float u = (float(i) + Rand()) / (screenSize.x - 1);
-        Ray r = InitRay(camera.origin, 
-            camera.lowerLeftCorner 
-            + u*camera.horizontal
-            + v*camera.vertical
-            - camera.origin);
-        color += HitSphere(s,r) ? vec3(0.9255, 0.549, 0.2392) : RayColor(r);
+        Ray r = GetRay(camera, u, v);
+        color += RayColor(r, world);
     }
-    color/=100;
+
+    color /= samples;
     WriteColor(i, j, color);
+}
+
+
+/*
+    Random Method Implementation 
+*/
+Method(Random)
+uint xor_shift_rand()
+{
+    state ^= (state << 13);
+    state ^= (state >> 17);
+    state ^= (state << 5);
+    return state;
+}
+
+void Seed(uvec2 screenCoord, uvec2 screenSize)
+{
+	state = uint(screenCoord.x + screenCoord.y * screenSize.x);
+}
+
+float Rand() { return float(xor_shift_rand()) * (1.0 / 4294967290.0); }
+
+vec2 RandVec2() { return vec2(Rand(),Rand()); }
+
+vec3 RandVec3() { return vec3(RandVec2(),Rand()); }
+
+vec3 RandUnitBall()
+{
+    while (true) {
+        vec3 p = RandVec3(); 
+        if (dot(p,p) > 1.0) continue;
+        return p;
+    }
+}
+
+vec3 RandSemiUnitBall(vec3 normal)
+{
+    vec3 unitBall = RandUnitBall();
+    if (dot(unitBall, normal) > 0.0) return unitBall;
+    else return -unitBall;
+}
+
+
+/*
+    Material Method Implementation 
+*/
+Method(Material)
+bool scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    switch(self.type)
+    {
+    case MaterialEnum.Lambertian:
+        return scatter(lambertians[self.ptr], r_in, rec, attenuation, scattered);
+    }
+    return false;
+}
+
+Method(Lambertian)
+bool scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    vec3 scatter_direction = rec.normal + RandVec3();
+    Init(scattered, rec.p, scatter_direction);
+    attenuation = self.albedo;
+    return true;
+}
+
+/*
+    Ray Method Implementation 
+*/
+Method(Ray)
+void Init(inout Ray self, vec3 origin, vec3 direction)
+{
+    self.origin = origin;
+    self.direction = normalize(direction);
+}
+
+vec3 At(Ray self, float t) { return self.origin + self.direction * t; }
+
+
+/*
+    Shpere Method Implementation 
+*/
+Method(Shpere)
+void Init(inout Sphere self, vec3 center, float radius)
+{
+    self.center = center;
+    self.radius = radius;
+}
+
+bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec)
+{
+    vec3 oc = r.origin - self.center;
+    float a = dot(r.direction,r.direction);
+    float half_b = dot(oc, r.direction);
+    float c = dot(oc,oc) - self.radius * self.radius;
+
+    float discriminant = half_b * half_b - a * c;
+    if (discriminant < 0) return false;
+    float sqrtd = sqrt(discriminant);
+
+    // Find the nearest root that lies in the acceptable range.
+    float root = (-half_b - sqrtd) / a;
+    if (root < t_min || t_max < root) {
+        root = (-half_b + sqrtd) / a;
+        if (root < t_min || t_max < root)
+            return false;
+    }
+
+    rec.t = root;
+    rec.p = At(r,rec.t);
+    vec3 outwardNormal = (rec.p - self.center) / self.radius;
+    SetFaceNormal(rec, r, outwardNormal);
+    //just for test
+    rec.mat = self.mat;
+    return true;
+}
+
+
+/*
+    Camera Method Implementation 
+*/
+Method(Camera)
+Ray GetRay(Camera self, float u, float v)
+{
+    Ray r;
+    Init(r, self.origin, 
+        self.lowerLeftCorner 
+        + u*self.horizontal
+        + v*self.vertical
+        - self.origin);
+    return r;
+}
+
+
+/*
+    HitRecord Method Implementation 
+*/
+Method(HitRecord)
+void SetFaceNormal(inout HitRecord self, Ray r, vec3 outwardNormal) 
+{
+    self.frontFace = dot(r.direction, outwardNormal) < 0;
+    self.normal = self.frontFace ? outwardNormal :-outwardNormal;
+}
+
+
+/*
+    World Method Implementation
+*/
+Method(World)
+bool Hit(World self, Ray r, float t_min, float t_max, out HitRecord rec)
+{
+    HitRecord temp_rec;
+    bool hit_anything = false;
+    float closest_so_far = t_max;
+
+    for (int i = 0; i < self.count; ++i) 
+    {
+        Sphere o = self.object[i];
+        if(Hit(o,r,t_min, closest_so_far, temp_rec))
+        {
+            hit_anything = true;
+            closest_so_far = temp_rec.t;
+            rec = temp_rec;
+        }
+    }
+    return hit_anything;
+}
+
+
+vec3 BackgroundColor(Ray r) 
+{
+    vec3 dir = r.direction;
+    float t = 0.5*(dir.y + 1.0);
+    return mix(vec3(1.0,1.0,1.0),vec3(0.5, 0.7, 1.0), t);
+}
+
+void WriteColor(int x, int y, vec3 color) 
+{ 
+    color = sqrt(color);
+    target.pixels[y * screenSize.x + x] = vec4(color,1.0);
 }

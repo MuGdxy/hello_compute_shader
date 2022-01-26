@@ -1,0 +1,38 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "Random.comph"
+
+uint xor_shift_rand()
+{
+    state ^= (state << 13);
+    state ^= (state >> 17);
+    state ^= (state << 5);
+    return state;
+}
+
+void Seed(uvec2 screenCoord, uvec2 screenSize)
+{
+	state = uint(screenCoord.x + screenCoord.y * screenSize.x);
+}
+
+float Rand() { return float(xor_shift_rand()) * (1.0 / 4294967290.0); }
+
+vec2 RandVec2() { return vec2(Rand(),Rand()); }
+
+vec3 RandVec3() { return vec3(RandVec2(),Rand()); }
+
+vec3 RandUnitBall()
+{
+    while (true) {
+        vec3 p = RandVec3(); 
+        if (dot(p,p) > 1.0) continue;
+        return p;
+    }
+}
+
+vec3 RandSemiUnitBall(vec3 normal)
+{
+    vec3 unitBall = RandUnitBall();
+    if (dot(unitBall, normal) > 0.0) return unitBall;
+    else return -unitBall;
+}

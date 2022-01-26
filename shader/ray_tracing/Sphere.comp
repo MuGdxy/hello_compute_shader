@@ -1,0 +1,37 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "Sphere.comph"
+
+void Init(inout Sphere self, vec3 center, float radius)
+{
+    self.center = center;
+    self.radius = radius;
+}
+
+bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec)
+{
+    vec3 oc = r.origin - self.center;
+    float a = dot(r.direction,r.direction);
+    float half_b = dot(oc, r.direction);
+    float c = dot(oc,oc) - self.radius * self.radius;
+
+    float discriminant = half_b * half_b - a * c;
+    if (discriminant < 0) return false;
+    float sqrtd = sqrt(discriminant);
+
+    // Find the nearest root that lies in the acceptable range.
+    float root = (-half_b - sqrtd) / a;
+    if (root < t_min || t_max < root) {
+        root = (-half_b + sqrtd) / a;
+        if (root < t_min || t_max < root)
+            return false;
+    }
+
+    rec.t = root;
+    rec.p = At(r,rec.t);
+    vec3 outwardNormal = (rec.p - self.center) / self.radius;
+    SetFaceNormal(rec, r, outwardNormal);
+    //just for test
+    rec.mat = self.mat;
+    return true;
+}
