@@ -1,14 +1,17 @@
+
 #ifndef MU_MATERIAL
 #define MU_MATERIAL
 #include "Ray.comph"
 
 #include "MaterialStructure.comph"
 
-Lambertian lambertians[1];
-
 #include "HitRecordStructure.comph"
+void Init(inout Lambertian self, vec3 albedo);
+bool Scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 
-bool scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
+void Init(inout Metal self, vec3 albedo, float fuzz);
+bool Scatter(Metal self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 
-bool scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
+void Init(inout Dielectrics self, float ir);
+bool Scatter(Dielectrics self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 #endif

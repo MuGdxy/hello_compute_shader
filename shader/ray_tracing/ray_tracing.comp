@@ -1,84 +1,73 @@
 #version 450
 #extension GL_GOOGLE_include_directive: enable
+#extension GL_EXT_debug_printf : enable
+
 #include "Random.comph"
 #include "Ray.comph"
 #include "Material.comph"
-#include "Sphere.comph"
+#include "Hittable.comph"
 #include "Camera.comph"
 
 const int blockSizeX = 32;
 const int blockSizeY = 32;
 layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
 
-
-struct World
-{
-    Sphere object[10];
-    int count;
-};
-
-layout(push_constant) uniform PushConstant 
+layout(push_constant, std140) uniform PushConstant 
 {
     ivec2 screenSize;
+    uint hittableCount;
+    uint samples;
+    uint maxDepth;
 };
-const int samples = 200;
-const int maxDepth = 800;
 
-layout(set = 0, binding = 0) buffer TargetBuffer
+layout(set = 0, binding = 0) writeonly buffer TargetBuffer
 {
     vec4 pixels[];
 } target;
 
-layout(set = 0, binding = 1, std140) uniform CameraBuffer
+layout(set = 0, binding = 1, std140) readonly buffer MaterialBuffer
+{
+    Material materials[];
+};
+
+layout(set = 0, binding = 2, std140) readonly buffer MaterialDumpBuffer
+{
+    vec4 data[];
+} materialData;
+
+layout(set = 0, binding = 3, std140) readonly buffer HittableBuffer
+{
+    Hittable hittables[];
+};
+
+layout(set = 0, binding = 4, std140) readonly buffer HittableDumpBuffer
+{
+    vec4 data[];
+} hittableData;
+
+layout(set = 1, binding = 0, std140) uniform CameraBuffer
 {
     Camera camera;
 };
 
-// layout(set = 1, binding = 0, std140) readonly buffer LambertianBuffer
-// {
-//     Lambertian lambertians[];
-// };
-
-// layout(set = 1, binding = 0, std140) readonly buffer GeometryBuffer
-// {
-//    int count;
-//    Sphere spheres[];
-// };
-
-bool Hit(World self, Ray r, float t_min, float t_max, out HitRecord rec);
+bool Hit(Hittable hittable, Ray r, float t_min, float t_max, out HitRecord rec);
+bool Hit(Ray r, float t_min, float t_max, out HitRecord rec);
+bool Scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 
 vec3 BackgroundColor(Ray r);
 void WriteColor(int x, int y, vec3 color);
 
-World world;
-
-void SetupWorld()
-{
-    Material m;
-    m.type = MaterialEnum.Lambertian;
-    m.ptr = 0;
-
-    lambertians[0].albedo = vec3(0.5);
-
-    Init(world.object[0], vec3(0, 0, -1), 0.5);
-    world.object[0].mat = m;
-
-    Init(world.object[1], vec3(0,-100.5,-1), 100);
-    world.object[1].mat = m;
-    world.count = 2;
-}
-
-vec3 RayColor(Ray r, World world)
+vec3 RayColor(Ray r)
 {
     vec3 color = vec3(1.0);
     Ray next = r;
     for(int i = 0; i < maxDepth; ++i)
     {
         HitRecord rec;
-        if(Hit(world, next, 0.001, 10000, rec))
+        if(Hit(next, 0.01, 10000, rec))
         {
             vec3 attenuation;
-            if(scatter(rec.mat, r, rec, attenuation, next))
+            if(Scatter(rec.mat, r, rec, attenuation, next))
                 color *= attenuation;
             else return vec3(0);
         }
@@ -92,8 +81,6 @@ void main()
 {
     Seed(gl_GlobalInvocationID.xy, screenSize);
 
-    SetupWorld();
-
     if(gl_GlobalInvocationID.x >= screenSize.x
         || gl_GlobalInvocationID.y >= screenSize.y) return;
     int i = int(gl_GlobalInvocationID.x);
@@ -103,10 +90,10 @@ void main()
 
     for(int sam = 0; sam < samples; ++sam)
     {
-        float v = (float(screenSize.y - j - 1) + Rand()) / (screenSize.y - 1);
-        float u = (float(i) + Rand()) / (screenSize.x - 1);
-        Ray r = GetRay(camera, u, v);
-        color += RayColor(r, world);
+        float s = (float(i) + Rand()) / (screenSize.x - 1);
+        float t = (float(screenSize.y - j - 1) + Rand()) / (screenSize.y - 1);
+        Ray r = GetRay(camera, s, t);
+        color += RayColor(r);
     }
 
     color /= samples;
@@ -114,22 +101,56 @@ void main()
 }
 
 
-/*
-    World Method Implementation
-*/
-bool Hit(World self, Ray r, float t_min, float t_max, out HitRecord rec)
+bool Scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    switch(self.type)
+    {
+    case MaterialEnum.Lambertian:
+        Lambertian lam;
+        Init(lam, materialData.data[self.ptr].xyz);
+        return Scatter(lam, r_in, rec, attenuation, scattered);
+    case MaterialEnum.Metal:
+        Metal met;
+        vec4 d = materialData.data[self.ptr];
+        Init(met, d.xyz, d.w);
+        return Scatter(met, r_in, rec, attenuation, scattered);
+    case MaterialEnum.Dielectrics:
+        Dielectrics dlt;
+        Init(dlt,materialData.data[self.ptr].x);
+        return Scatter(dlt, r_in, rec, attenuation, scattered);
+    }
+    return false;
+}
+
+bool Hit(Hittable hittable, Ray r, float t_min, float t_max, out HitRecord rec)
+{
+    switch(hittable.type)//disptach
+    {
+    case HittableEnum.Sphere:
+        Sphere s;
+        vec3 center =  hittableData.data[hittable.ptr].xyz;
+        float radius =  hittableData.data[hittable.ptr].w;
+        Init(s, center, radius);
+        return Hit(s, r, t_min, t_max, rec);
+    default:
+        return false;
+    }
+}
+
+bool Hit(Ray r, float t_min, float t_max, out HitRecord rec)
 {
     HitRecord temp_rec;
     bool hit_anything = false;
     float closest_so_far = t_max;
 
-    for (int i = 0; i < self.count; ++i) 
+    for (int i = 0; i < hittableCount; ++i) 
     {
-        Sphere o = self.object[i];
-        if(Hit(o,r,t_min, closest_so_far, temp_rec))
+        Hittable obj = hittables[i];
+        if(Hit(obj, r, t_min, closest_so_far, temp_rec))
         {
             hit_anything = true;
             closest_so_far = temp_rec.t;
+            temp_rec.mat = materials[obj.mat];
             rec = temp_rec;
         }
     }
@@ -147,6 +168,7 @@ vec3 BackgroundColor(Ray r)
 
 void WriteColor(int x, int y, vec3 color) 
 { 
+    //gamma correct
     color = sqrt(color);
     target.pixels[y * screenSize.x + x] = vec4(color,1.0);
 }

@@ -8,7 +8,5 @@ struct HitRecord
     float t;
     bool frontFace;
     Material mat;
-    //just for test;
-    Lambertian lam;
 };
 #endif

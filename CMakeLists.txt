@@ -45,6 +45,7 @@ add_executable(
 add_executable(
     ComputeShaderRayTracing
     "src/ComputeShaderRayTracing/main.cpp"
+    "src/ComputeShaderRayTracing/DataDump.h"
     ${MuVkHeaders}
 )
 

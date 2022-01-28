@@ -4,8 +4,11 @@ uint state;
 uint xor_shift_rand();
 void Seed(uvec2 screenCoord, uvec2 screenSize);
 float Rand();
-vec2 RandVec2();
-vec3 RandVec3();
+float Rand(float min_, float max_);
+vec2 RandVec2(float min_, float max_);
+vec3 RandVec3(float min_, float max_);
 vec3 RandUnitBall();
-vec3 RandSemiUnitBall();
+vec2 RandDisk();
+vec3 RandSemiUnitBall(vec3 normal);
+vec3 RandUnitVector();
 #endif

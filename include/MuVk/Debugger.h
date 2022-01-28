@@ -6,9 +6,9 @@
 
 namespace MuVk
 {
-	const std::vector<const char*> validationLayers =
+	const std::vector validationLayers =
 	{
-		"VK_LAYER_KHRONOS_validation"
+		"VK_LAYER_KHRONOS_validation",
 	};
 
 	inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -22,6 +22,11 @@ namespace MuVk
 			std::cerr << "validation layer:\n\t" << pCallbackData->pMessage << "\n" << std::endl;
 			__debugbreak();
 		}
+		//if(messageType == VK_DEBUG_REPORT_INFORMATION_BIT_EXT)
+		//{
+		//	std::cerr << "validation layer:\n\t" << pCallbackData->pMessage << "\n" << std::endl;
+		//}
+		//std::cerr << "validation layer:\n\t" << pCallbackData->pMessage << "\n" << std::endl;
 		return VK_FALSE;
 	}
 
@@ -32,12 +37,13 @@ namespace MuVk
 			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
 			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
-			;
+			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
 
 		createInfo.messageType =
 			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 			| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
 			| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
 		createInfo.pfnUserCallback = debugCallback;
 		createInfo.pUserData = nullptr;
 		return createInfo;

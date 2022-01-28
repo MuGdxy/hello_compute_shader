@@ -1,6 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive: enable
-#include "Sphere.comph"
+#include "Hittable.comph"
 
 void Init(inout Sphere self, vec3 center, float radius)
 {
@@ -31,7 +31,5 @@ bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec)
     rec.p = At(r,rec.t);
     vec3 outwardNormal = (rec.p - self.center) / self.radius;
     SetFaceNormal(rec, r, outwardNormal);
-    //just for test
-    rec.mat = self.mat;
     return true;
 }

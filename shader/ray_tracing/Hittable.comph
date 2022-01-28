@@ -4,11 +4,24 @@
 #include "HitRecord.comph"
 #include "Material.comph"
 
+const struct
+{
+    uint None;
+    uint TriangleMesh;
+    uint Sphere;
+} HittableEnum = {0,1,2};
+
+struct Hittable
+{
+    uint type;
+    uint ptr;
+    uint mat;
+};
+
 struct Sphere
 {
     vec3    center;
     float   radius;
-    Material mat;
 };
 
 void Init(inout Sphere self, vec3 center, float radius);

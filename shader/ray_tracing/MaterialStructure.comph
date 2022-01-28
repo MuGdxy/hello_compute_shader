@@ -6,7 +6,7 @@ const struct
     uint Lambertian;
     uint Metal;
     uint Dielectrics;
-} MaterialEnum = {0,1,2,4};
+} MaterialEnum = {0,1,2,3};
 
 struct Material 
 { 
@@ -17,5 +17,16 @@ struct Material
 struct Lambertian
 { 
     vec3 albedo; 
+};
+
+struct Metal
+{
+    vec3 albedo;
+    float fuzz;
+};
+
+struct Dielectrics
+{
+    float ir;
 };
 #endif

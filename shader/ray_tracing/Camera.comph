@@ -8,12 +8,17 @@ struct Camera
     vec3    horizontal;
     vec3    vertical;
     vec3    lowerLeftCorner;
-    //:4
+
     float   viewportHeight;
     float   viewportWidth;
     float   aspectRatio;
     float   focalLength;
+
+    vec3    u;
+    vec3    v;
+    vec3    w;
+    float   lensRadius;
 };
 
-Ray GetRay(Camera self, float u, float v);
+Ray GetRay(Camera self, float s, float t);
 #endif
