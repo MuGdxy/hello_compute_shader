@@ -69,10 +69,10 @@ bool Scatter(Dielectrics self, Ray r_in, HitRecord rec, out vec3 attenuation, ou
     vec3 direction;
 
     if (cannot_refract || Reflectance(cos_theta, refraction_ratio) > Rand())
-        direction = reflect(-dir, rec.normal);
+        direction = reflect(dir, rec.normal);
     else
         direction = refract(dir, rec.normal, refraction_ratio);
-
+    
     Init(scattered, rec.p, direction);
     return true;
 }

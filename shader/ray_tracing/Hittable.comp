@@ -1,5 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive: enable
+#extension GL_EXT_debug_printf : enable
 #include "Hittable.comph"
 
 void Init(inout Sphere self, vec3 center, float radius)
@@ -26,7 +27,7 @@ bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec)
         if (root < t_min || t_max < root)
             return false;
     }
-
+    
     rec.t = root;
     rec.p = At(r,rec.t);
     vec3 outwardNormal = (rec.p - self.center) / self.radius;

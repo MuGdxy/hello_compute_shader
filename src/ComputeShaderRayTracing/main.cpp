@@ -31,8 +31,8 @@ public:
 		const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
 
 		target = TargetBuffer(imageWidth, imageHeight);
-		point3 lookfrom(-13, 10, -5);
-		point3 lookat(-1, 0, -1);
+		point3 lookfrom(0, 0, -5);
+		point3 lookat(0, 0, -1);
 		vec3 vup(0, 1, 0);
 		auto distToFocus = glm::distance(lookat,lookfrom);
 		auto aperture = 0;
@@ -58,42 +58,41 @@ public:
 			materials.Allocate<Dielectric>(1.2),
 			materials.Allocate<Dielectric>(1.5),
 		};
-		//hittables.Allocate<Sphere>(glm::vec3(0, -10.5, -1), 10)->mat = m[0];
-		hittables.Allocate<Sphere>(glm::vec3(0, 0, 0), 0.5f)->mat = m[1];
+		hittables.Allocate<Sphere>(glm::vec3(0, -100.5, -1), 100)->mat = m[0];
+		hittables.Allocate<Sphere>(glm::vec3(0, 0, 0), 0.5f)->mat = m[11];
 
 		//hittables.Allocate<Sphere>(glm::vec3(1, 0, -1), 0.5f)->mat = m[4];
 		//hittables.Allocate<Sphere>(glm::vec3(0, 0, 0), 0.5f)->mat = m[1];
 		//hittables.Allocate<Sphere>(glm::vec3(-1, 1, -5), 0.5f)->mat = m[1];
 
-		hittables.Allocate<Sphere>(glm::vec3(1, 0, 0), 0.5f)->mat = m[4];
-		hittables.Allocate<Sphere>(glm::vec3(0, 0, 1), 0.5f)->mat = m[5];
+		//hittables.Allocate<Sphere>(glm::vec3(1, 0, 0), 0.5f)->mat = m[4];
+		//hittables.Allocate<Sphere>(glm::vec3(0, 0, 1), 0.5f)->mat = m[5];
 
-		hittables.Allocate<Sphere>(glm::vec3(3, 0, 3), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(2, 0, 2), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(1, 0, 1), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(-1, 0, -1), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(-2, 0, -2), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(-3, 0, -3), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(-4, 0, -4), 0.5f)->mat = m[1];
-		hittables.Allocate<Sphere>(glm::vec3(-5, 0, -5), 0.5f)->mat = m[1];
-		//hittables.Allocate<Sphere>(glm::vec3(-1, 0, -1), -0.3f)->mat = m[9];
+		//hittables.Allocate<Sphere>(glm::vec3(3, 0, 3), 0.5f)->mat = m[1];
+		//hittables.Allocate<Sphere>(glm::vec3(2, 0, 2), 0.5f)->mat = m[5];
+		//hittables.Allocate<Sphere>(glm::vec3(1, 0, 1), 0.5f)->mat = m[1];
+		//hittables.Allocate<Sphere>(glm::vec3(-1, 0, -1), 0.5f)->mat = m[7];
+		//hittables.Allocate<Sphere>(glm::vec3(-2, 0, -2), 0.5f)->mat = m[6];
+		//hittables.Allocate<Sphere>(glm::vec3(-4, 0, -4), 0.5f)->mat = m[1];
+		//hittables.Allocate<Sphere>(glm::vec3(-3, 0, -3),0.5f)->mat = m[11];
+		//hittables.Allocate<Sphere>(glm::vec3(-3, 0, -3), -0.45f)->mat = m[11];
 
 		pushConstantData.hittableCount = hittables.Count();
 		pushConstantData.screenSize = {imageWidth, imageHeight};
 		pushConstantData.maxDepth = 50;
-		pushConstantData.samples = 500;
+		pushConstantData.samples = 1;
 	};
 
-	void GreatScene()
+	void GreatScene1()
 	{
 		//image
 		const auto aspectRatio = 16.0 / 9.0;
-		const int imageWidth = 800;
+		const int imageWidth = 2560;
 		const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
 		
 		pushConstantData.screenSize = { imageWidth, imageHeight };
-		pushConstantData.maxDepth = 200;
-		pushConstantData.samples = 500;
+		pushConstantData.maxDepth = 100;
+		pushConstantData.samples = 200;
 		
 		target = TargetBuffer(imageWidth, imageHeight);
 		
@@ -123,7 +122,7 @@ public:
 						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
 					}
 					else {
-						// glass
+						//glass
 						mat = materials.Allocate<Dielectric>(1.5);
 						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
 					}
@@ -136,20 +135,140 @@ public:
 
 		auto material2 = materials.Allocate<Lambertian>(color(0.4, 0.2, 0.1));
 		hittables.Allocate<Sphere>(point3(-4, 1, 0), 1.0)->mat = material2;
+		hittables.Allocate<Sphere>(point3(-4, 1, 0), 1.0)->mat = material2;
 
+		auto material3 = materials.Allocate<Metal>(color(0.7, 0.6, 0.5), 0.0);
+		hittables.Allocate<Sphere>(point3(4, 1, 0), 1.0)->mat = material3;
 		// Camera
-		point3 lookfrom(-13, 2, 3);
+		point3 lookfrom(13, 2, 3);
 		point3 lookat(0, 0, 0);
 		vec3 vup(0, 1, 0);
 		auto distTofocus = 10.0;
 		auto aperture = 0;
 
-		camera= Camera(lookfrom, lookat, vup, 20, aspectRatio, aperture, distTofocus);
+		camera= Camera(lookfrom, lookat, vup, 30, aspectRatio, aperture, distTofocus);
 
 		
 		pushConstantData.hittableCount = hittables.Count();
 	}
 
+	void GreatScene()
+	{
+		//image
+		const auto aspectRatio = 16.0 / 9.0;
+		const int imageWidth = 1920;
+		const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
+
+		pushConstantData.screenSize = { imageWidth, imageHeight };
+		pushConstantData.maxDepth = 50;
+		pushConstantData.samples = 200;
+
+		target = TargetBuffer(imageWidth, imageHeight);
+
+		auto groundMaterial = materials.Allocate<Lambertian>(color(249.0/255.0, 189.0/255.0, 219.0/255.0));
+		hittables.Allocate<Sphere>(point3(0, -1000, 0), 1000)->mat = groundMaterial;
+
+		for (int a = -11; a < 11; a++) {
+			for (int b = -11; b < 11; b++) {
+				using namespace glm;
+				auto choose_mat = linearRand(0.0, 1.0);
+				point3 center(a + 0.9 * linearRand(0.0, 1.0), 0.2, b + 0.9 * linearRand(0.0, 1.0));
+
+				if (distance(center, point3(4, 0.2, 0)) > 0.9) {
+					Material* mat;
+					auto percent = 0.0;
+					//orange
+					if (choose_mat/0.7 < (percent+=0.2)) {
+						// diffuse
+						auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1)) 
+							+ vec3(254.0/255.0, 193.0/255.0, 172.0/255.0);
+						mat = materials.Allocate<Lambertian>(albedo);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					//purple
+					else if (choose_mat/0.7 < (percent += 0.15)) {
+						// diffuse
+						auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1))
+							+ vec3(249.0 / 255.0, 205.0 / 255.0, 255.0 / 255.0);
+						mat = materials.Allocate<Lambertian>(albedo);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					//blue
+					else if (choose_mat/0.7 < (percent += 0.20)) {
+						// diffuse
+						auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1))
+							+ vec3(187.0 / 255.0, 240.0 / 255.0, 239.0 / 255.0);
+						mat = materials.Allocate<Lambertian>(albedo);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					//dark blue
+					else if (choose_mat/0.7 < (percent += 0.10)) {
+						// diffuse
+						auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1))
+							+ vec3(185.0 / 255.0, 203.0 / 255.0, 255.0 / 255.0);
+						mat = materials.Allocate<Lambertian>(albedo);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					//green
+					else if (choose_mat / 0.7 < (percent += 0.15)) {
+						// diffuse
+						auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1))
+							+ vec3(197.0 / 255.0, 243.0 / 255.0, 195.0 / 255.0);
+						mat = materials.Allocate<Lambertian>(albedo);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					//yellow
+					else if (choose_mat / 0.7 < (percent += 0.20)) {
+						// diffuse
+						auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1))
+							+ vec3(245.0 / 255.0, 241.0 / 255.0, 185.0 / 255.0);
+						mat = materials.Allocate<Lambertian>(albedo);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					////red
+					//else if (choose_mat / 0.8 < (percent += 0.10)) {
+					//	// diffuse
+					//	auto albedo = linearRand(vec3(-0.1), vec3(0.1)) * linearRand(vec3(-0.1), vec3(0.1))
+					//		+ vec3(251.0 / 255.0, 197.0 / 255.0, 201.0 / 255.0);
+					//	mat = materials.Allocate<Lambertian>(albedo);
+					//	hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					//}
+					else if (choose_mat < 0.9) {
+						// metal
+						auto albedo = linearRand(vec3(0.5), vec3(1));
+						auto fuzz = linearRand(0.0, 0.5);
+						mat = materials.Allocate<Metal>(albedo, fuzz);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+					else {
+						//glass
+						mat = materials.Allocate<Dielectric>(1.5);
+						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
+					}
+				}
+			}
+		}
+
+		auto material1 = materials.Allocate<Dielectric>(1.5);
+		hittables.Allocate<Sphere>(point3(0, 1, 0), 1.0)->mat = material1;
+
+		auto material2 = materials.Allocate<Lambertian>(color(242.0/255.0, 220.0/255.0, 196.0/255.0));
+		hittables.Allocate<Sphere>(point3(-4, 1, 0), 1.0)->mat = material2;
+
+		auto material3 = materials.Allocate<Metal>(color(253.0/255.0, 236.0/255.0, 223.0/255.0), 0.0);
+		hittables.Allocate<Sphere>(point3(4, 1, 0), 1.0)->mat = material3;
+		// Camera
+		point3 lookfrom(13, 2, 3);
+		point3 lookat(0, 0, 0);
+		vec3 vup(0, 1, 0);
+		auto distTofocus = 10.0;
+		auto aperture = 0;
+
+		camera = Camera(lookfrom, lookat, vup, 30, aspectRatio, aperture, distTofocus);
+
+
+		pushConstantData.hittableCount = hittables.Count();
+	}
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	void createInstance()
@@ -554,6 +673,7 @@ public:
 		submitInfo.pCommandBuffers = &commandBuffer;
 		submitInfo.waitSemaphoreCount = 0;
 		submitInfo.signalSemaphoreCount = 0;
+
 		if (vkQueueSubmit(computeTransferQueue, 1, &submitInfo, VK_NULL_HANDLE)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to submit command buffer!");
@@ -622,7 +742,15 @@ public:
 
 int main()
 {
-    ComputeShaderExample program;
-    program.Run();
+	ComputeShaderExample program;
+	try
+	{
+		program.Run();
+	}
+	catch (std::runtime_error)
+	{
+		program.cleanUp();
+	}
+
 }
 

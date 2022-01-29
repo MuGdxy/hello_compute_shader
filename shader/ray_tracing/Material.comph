@@ -6,6 +6,7 @@
 #include "MaterialStructure.comph"
 
 #include "HitRecordStructure.comph"
+
 void Init(inout Lambertian self, vec3 albedo);
 bool Scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 
