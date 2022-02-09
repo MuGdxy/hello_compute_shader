@@ -30,24 +30,24 @@ add_executable(
     ${MuVkHeaders}
 )
 
-add_executable(
-    ViewID
-    "src/ViewID.cpp"
-    ${MuVkHeaders}
-)
+# add_executable(
+#     ViewID
+#     "src/ViewID.cpp"
+#     ${MuVkHeaders}
+# )
 
-add_executable(
-    PhysicalDeviceProperties
-    "src/PhysicalDeviceProperties.cpp"
-    ${MuVkHeaders}
-)
+# add_executable(
+#     PhysicalDeviceProperties
+#     "src/PhysicalDeviceProperties.cpp"
+#     ${MuVkHeaders}
+# )
 
-add_executable(
-    ComputeShaderRayTracing
-    "src/ComputeShaderRayTracing/main.cpp"
-    "src/ComputeShaderRayTracing/DataDump.h"
-    ${MuVkHeaders}
-)
+# add_executable(
+#     ComputeShaderRayTracing
+#     "src/ComputeShaderRayTracing/main.cpp"
+#     "src/ComputeShaderRayTracing/DataDump.h"
+#     ${MuVkHeaders}
+# )
 
 add_executable(
     CSRT-vma
