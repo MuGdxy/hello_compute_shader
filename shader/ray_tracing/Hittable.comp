@@ -3,6 +3,47 @@
 #extension GL_EXT_debug_printf : enable
 #include "Hittable.comph"
 
+bool HitAny(uint count, Ray r, float t_min, float t_max, out HitRecord rec)
+{
+    HitRecord temp_rec;
+    bool hit_anything = false;
+    float closest_so_far = t_max;
+
+    for (int i = 0; i < count; ++i)
+    {
+        Hittable obj;
+        Deref(obj, i);
+        if(Hit(obj, r, t_min, closest_so_far, temp_rec))
+        {
+            hit_anything = true;
+            closest_so_far = temp_rec.t;
+            temp_rec.mat = obj.mat;
+            rec = temp_rec;
+        }
+    }
+    return hit_anything;
+}
+
+bool Hit(Hittable self, Ray r, float t_min, float t_max, out HitRecord rec)
+{
+    switch(self.type)
+    {
+    case HittableEnum.Sphere:
+    {
+        Sphere s;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        vec3 center =  data.xyz;
+        float radius =  data.w;
+        Init(s, center, radius);
+        return Hit(s, r, t_min, t_max, rec);
+    }
+    default:
+        return false;
+    }
+}
+
+
 void Init(inout Sphere self, vec3 center, float radius)
 {
     self.center = center;

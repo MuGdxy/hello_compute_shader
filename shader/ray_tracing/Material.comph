@@ -1,11 +1,45 @@
 
 #ifndef MU_MATERIAL
 #define MU_MATERIAL
+#include "PointerEx.comph"
 #include "Ray.comph"
+#include "HitRecord.comph"
+const struct
+{
+    uint None;
+    uint Lambertian;
+    uint Metal;
+    uint Dielectrics;
+} MaterialEnum = {0,1,2,3};
 
-#include "MaterialStructure.comph"
+struct Material 
+{ 
+    uint type;
+    uint ptr; 
+};
 
-#include "HitRecordStructure.comph"
+struct Lambertian
+{ 
+    vec3 albedo; 
+};
+
+struct Metal
+{
+    vec3 albedo;
+    float fuzz;
+};
+
+struct Dielectrics
+{
+    float ir;
+};
+
+Interface
+void Deref(out Material mat, Pointer ptr);
+Interface
+void Deref(Material, out vec4 data, Pointer ptr);
+
+bool Scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 
 void Init(inout Lambertian self, vec3 albedo);
 bool Scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);

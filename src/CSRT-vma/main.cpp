@@ -1,11 +1,16 @@
 #include <iostream>
 #include <optional>
-#include "MuVk/MuVK.h"
 #include <array>
 #include<glm/glm.hpp>
 #include <glm/gtc/random.hpp>
 #include "DataDump.h"
 #include <chrono>
+#include <vulkan/vk_mem_alloc.h>
+#include <filesystem>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+#include "MuVk/MuVK.h"
+
 #ifndef MU_SHADER_PATH
 #define MU_SHADER_PATH "./shader/"
 #endif
@@ -24,134 +29,7 @@ public:
 	HittableDump hittables;
 	MaterialDump materials;
 	PushConstantData pushConstantData;
-	void SetupScene()
-	{
-		const auto aspectRatio = 16.0 / 9.0;
-		const int imageWidth = 800;
-		const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
-
-		target = TargetBuffer(imageWidth, imageHeight);
-		point3 lookfrom(0, 0, -5);
-		point3 lookat(0, 0, -1);
-		vec3 vup(0, 1, 0);
-		auto distToFocus = glm::distance(lookat,lookfrom);
-		auto aperture = 0;
-		camera = Camera(lookfrom, lookat, vup, 20, aspectRatio, aperture, distToFocus);
-
-		screenSize.x = imageWidth;
-		screenSize.y = imageHeight;
-
-		std::vector<Material*> m =
-		{
-			materials.Allocate<Lambertian>(glm::vec3(0.8,0.8,0)),
-			materials.Allocate<Lambertian>(glm::vec3(0.5)),
-			materials.Allocate<Lambertian>(glm::vec3(0.1,0.2,0.4)),
-			materials.Allocate<Lambertian>(glm::vec3(0.1,0.3,0.5)),
-			materials.Allocate<Lambertian>(glm::vec3(1,0,0)),
-			materials.Allocate<Lambertian>(glm::vec3(0,0,1)),
-
-			materials.Allocate<Metal>(glm::vec3(0.7), 0),
-			materials.Allocate<Metal>(glm::vec3(0.5), 0.8),
-			materials.Allocate<Metal>(glm::vec3(0.9), 0.2),
-
-			materials.Allocate<Dielectric>(1.1),
-			materials.Allocate<Dielectric>(1.2),
-			materials.Allocate<Dielectric>(1.5),
-		};
-		hittables.Allocate<Sphere>(glm::vec3(0, -100.5, -1), 100)->mat = m[0];
-		hittables.Allocate<Sphere>(glm::vec3(0, 0, 0), 0.5f)->mat = m[11];
-
-		//hittables.Allocate<Sphere>(glm::vec3(1, 0, -1), 0.5f)->mat = m[4];
-		//hittables.Allocate<Sphere>(glm::vec3(0, 0, 0), 0.5f)->mat = m[1];
-		//hittables.Allocate<Sphere>(glm::vec3(-1, 1, -5), 0.5f)->mat = m[1];
-
-		//hittables.Allocate<Sphere>(glm::vec3(1, 0, 0), 0.5f)->mat = m[4];
-		//hittables.Allocate<Sphere>(glm::vec3(0, 0, 1), 0.5f)->mat = m[5];
-
-		//hittables.Allocate<Sphere>(glm::vec3(3, 0, 3), 0.5f)->mat = m[1];
-		//hittables.Allocate<Sphere>(glm::vec3(2, 0, 2), 0.5f)->mat = m[5];
-		//hittables.Allocate<Sphere>(glm::vec3(1, 0, 1), 0.5f)->mat = m[1];
-		//hittables.Allocate<Sphere>(glm::vec3(-1, 0, -1), 0.5f)->mat = m[7];
-		//hittables.Allocate<Sphere>(glm::vec3(-2, 0, -2), 0.5f)->mat = m[6];
-		//hittables.Allocate<Sphere>(glm::vec3(-4, 0, -4), 0.5f)->mat = m[1];
-		//hittables.Allocate<Sphere>(glm::vec3(-3, 0, -3),0.5f)->mat = m[11];
-		//hittables.Allocate<Sphere>(glm::vec3(-3, 0, -3), -0.45f)->mat = m[11];
-
-		pushConstantData.hittableCount = hittables.Count();
-		pushConstantData.screenSize = {imageWidth, imageHeight};
-		pushConstantData.maxDepth = 50;
-		pushConstantData.samples = 1;
-	};
-
-	void GreatScene1()
-	{
-		//image
-		const auto aspectRatio = 16.0 / 9.0;
-		const int imageWidth = 2560;
-		const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
-		
-		pushConstantData.screenSize = { imageWidth, imageHeight };
-		pushConstantData.maxDepth = 100;
-		pushConstantData.samples = 200;
-		
-		target = TargetBuffer(imageWidth, imageHeight);
-		
-		auto groundMaterial = materials.Allocate<Lambertian>(color(0.5, 0.5, 0.5));
-		hittables.Allocate<Sphere>(point3(0, -1000, 0), 1000)->mat = groundMaterial;
-
-		for (int a = -11; a < 11; a++) {
-			for (int b = -11; b < 11; b++) {
-				using namespace glm;
-				auto choose_mat = linearRand(0.0,1.0);
-				point3 center(a + 0.9 * linearRand(0.0, 1.0), 0.2, b + 0.9 * linearRand(0.0, 1.0));
-
-				if (distance(center, point3(4, 0.2, 0)) > 0.9) {
-					Material* mat;
-
-					if (choose_mat < 0.8) {
-						// diffuse
-						auto albedo = linearRand(vec3(0),vec3(1)) * linearRand(vec3(0), vec3(1));
-						mat = materials.Allocate<Lambertian>(albedo);
-						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
-					}
-					else if (choose_mat < 0.95) {
-						// metal
-						auto albedo = linearRand(vec3(0.5), vec3(1));
-						auto fuzz = linearRand(0.0, 0.5);
-						mat = materials.Allocate<Metal>(albedo, fuzz);
-						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
-					}
-					else {
-						//glass
-						mat = materials.Allocate<Dielectric>(1.5);
-						hittables.Allocate<Sphere>(center, 0.2)->mat = mat;
-					}
-				}
-			}
-		}
-
-		auto material1 = materials.Allocate<Dielectric>(1.5);
-		hittables.Allocate<Sphere>(point3(0, 1, 0), 1.0)->mat = material1;
-
-		auto material2 = materials.Allocate<Lambertian>(color(0.4, 0.2, 0.1));
-		hittables.Allocate<Sphere>(point3(-4, 1, 0), 1.0)->mat = material2;
-		hittables.Allocate<Sphere>(point3(-4, 1, 0), 1.0)->mat = material2;
-
-		auto material3 = materials.Allocate<Metal>(color(0.7, 0.6, 0.5), 0.0);
-		hittables.Allocate<Sphere>(point3(4, 1, 0), 1.0)->mat = material3;
-		// Camera
-		point3 lookfrom(13, 2, 3);
-		point3 lookat(0, 0, 0);
-		vec3 vup(0, 1, 0);
-		auto distTofocus = 10.0;
-		auto aperture = 0;
-
-		camera= Camera(lookfrom, lookat, vup, 30, aspectRatio, aperture, distTofocus);
-
-		
-		pushConstantData.hittableCount = hittables.Count();
-	}
-
+	const size_t maxSamplesForSingleShader = 50;
 	void GreatScene()
 	{
 		//image
@@ -161,7 +39,7 @@ public:
 
 		pushConstantData.screenSize = { imageWidth, imageHeight };
 		pushConstantData.maxDepth = 50;
-		pushConstantData.samples = 200;
+		pushConstantData.totalSamples = 800;
 
 		target = TargetBuffer(imageWidth, imageHeight);
 
@@ -269,9 +147,9 @@ public:
 
 		pushConstantData.hittableCount = hittables.Count();
 	}
+	
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
-	
 	void createInstance()
 	{
 		VkApplicationInfo appInfo = MuVk::applicationInfo();
@@ -306,6 +184,7 @@ public:
 		{ 
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
+		MuVk::Utils::appendGLFWRequiredExtensions(extensions);
 
 		instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 		instanceCreateInfo.ppEnabledExtensionNames = extensions.data();
@@ -330,9 +209,7 @@ public:
 	}
 
 	VkPhysicalDevice physicalDevice;
-
-	std::optional<uint32_t> computeTransferQueueFamilyIndex;
-
+	std::optional<uint32_t> queueFamilyIndex;
 	void pickPhyscialDevice()
 	{
 		auto physicalDevices = MuVk::Query::physicalDevices(instance);
@@ -346,19 +223,26 @@ public:
 				if (queueFamilies[i].queueFlags & (VK_QUEUE_COMPUTE_BIT) &&
 					queueFamilies[i].queueFlags & (VK_QUEUE_TRANSFER_BIT))
 				{
-					computeTransferQueueFamilyIndex = i;
-					physicalDevice = device;
-					break;
+					VkBool32 presentSupport;
+					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+					if (presentSupport)
+					{
+						queueFamilyIndex = i;
+						physicalDevice = device;
+						break;
+					}
 				}
 			}
-			if (computeTransferQueueFamilyIndex.has_value()) break;
+			if (queueFamilyIndex.has_value()) break;
 		}
-		if (!computeTransferQueueFamilyIndex.has_value())
+		auto properties = MuVk::Query::deviceExtensionProperties(physicalDevice);
+		std::cout << properties << std::endl;
+		if (!queueFamilyIndex.has_value())
 			throw std::runtime_error("can't find a family that contains compute&transfer queue!");
 		else
 		{
 			std::cout << "Select Physical Device:" << physicalDevice << std::endl;
-			std::cout << "Select Queue Index:" << computeTransferQueueFamilyIndex.value() << std::endl;
+			std::cout << "Select Queue Index:" << queueFamilyIndex.value() << std::endl;
 		}
 		auto p = MuVk::Query::physicalDeviceProperties(physicalDevice);
 		std::cout << "maxComputeWorkGroupInvocations:" << p.limits.maxComputeWorkGroupInvocations << std::endl;
@@ -366,14 +250,14 @@ public:
 	}
 
 	VkDevice device;
-	VkQueue computeTransferQueue;
-
+	VkQueue universalQueue;
 	void createLogicalDevice()
 	{
 		VkDeviceCreateInfo createInfo = MuVk::deviceCreateInfo();
 		const std::vector<const char*> extensions = 
 		{
-			VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
+			VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		};
 		createInfo.enabledExtensionCount = extensions.size();
 		createInfo.ppEnabledExtensionNames = extensions.data();
@@ -381,7 +265,7 @@ public:
 		VkDeviceQueueCreateInfo queueCreateInfo = MuVk::deviceQueueCreateInfo();
 		queueCreateInfo.queueCount = 1;
 		queueCreateInfo.pQueuePriorities = &priority;
-		queueCreateInfo.queueFamilyIndex = computeTransferQueueFamilyIndex.value();
+		queueCreateInfo.queueFamilyIndex = queueFamilyIndex.value();
 
 		createInfo.queueCreateInfoCount = 1;
 		createInfo.pQueueCreateInfos = &queueCreateInfo;
@@ -389,14 +273,14 @@ public:
 		{
 			throw std::runtime_error("failed to create logical device");
 		}
-		vkGetDeviceQueue(device, computeTransferQueueFamilyIndex.value(), 0, &computeTransferQueue);
+		vkGetDeviceQueue(device, queueFamilyIndex.value(), 0, &universalQueue);
 	}
 
 	std::array<VkBuffer,5> storageBuffers;
-	std::array <VkDeviceMemory,5> storageBufferMemorys;
-
+	
+	std::array <VmaAllocation,5>  storageAllocation;
 	VkBuffer uniformBuffer;
-	VkDeviceMemory uniformBufferMemory;
+	VmaAllocation uniformAllocation;
 	void createBuffer(VkBufferUsageFlags usage, VkBuffer& buffer, VkDeviceMemory& memory)
 	{
 		VkBufferCreateInfo createInfo = MuVk::bufferCreateInfo();
@@ -404,8 +288,9 @@ public:
 		createInfo.usage = usage;
 		createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		createInfo.queueFamilyIndexCount = 1;
-		createInfo.pQueueFamilyIndices = &computeTransferQueueFamilyIndex.value();
+		createInfo.pQueueFamilyIndices = &queueFamilyIndex.value();
 		createInfo.pNext = nullptr;
+
 		if (vkCreateBuffer(device, &createInfo, nullptr, &buffer) != VK_SUCCESS)
 			throw std::runtime_error("failed to create buffer!");
 
@@ -421,16 +306,57 @@ public:
 
 		vkBindBufferMemory(device, buffer, memory, 0);
 	}
+	void createBuffer(VkBufferUsageFlags usage, VkBuffer& buffer, VmaAllocation& allocation)
+	{
+		VkBufferCreateInfo bufferInfo = MuVk::bufferCreateInfo();
+		bufferInfo.size = target.DumpSize();
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		bufferInfo.queueFamilyIndexCount = VK_QUEUE_FAMILY_IGNORED;
+		bufferInfo.pQueueFamilyIndices = nullptr;
 
+		VmaAllocationCreateInfo allocInfo = {};
+		allocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+		//VkBuffer buffer;
+		//VmaAllocation allocation;
+		if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr)
+			!= VK_SUCCESS)
+			throw std::runtime_error("failed to create buffer!");
+	}
 	void createBuffers()
 	{
 		for (size_t i = 0; i < storageBuffers.size(); i++)
 		{
-			createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, storageBuffers[i], storageBufferMemorys[i]);
+			createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, storageBuffers[i], storageAllocation[i]);
 		}
-		createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, uniformBuffer, uniformBufferMemory);
+		createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, uniformBuffer, uniformAllocation);
 	}
-
+	
+	VkImage storageImage;
+	VmaAllocation storageImageAllocation;
+	void createStorageImage()
+	{
+		VkImageCreateInfo imageInfo = MuVk::imageCreateInfo();
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.extent.width = static_cast<uint32_t>(WIDTH);
+		imageInfo.extent.height = static_cast<uint32_t>(HEIGHT);
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.mipLevels = 1;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.flags = 0;
+		VmaAllocationCreateInfo allocInfo = {};
+		allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		vmaCreateImage(allocator, &imageInfo, &allocInfo, &storageImage, &storageImageAllocation, nullptr);
+	}
+	
 	uint32_t findMemoryType(const VkMemoryRequirements& requirements, VkMemoryPropertyFlags properties)
 	{
 		VkPhysicalDeviceMemoryProperties memProperties = MuVk::Query::physicalDeviceMemoryProperties(physicalDevice);
@@ -455,14 +381,43 @@ public:
 		vkUnmapMemory(device, memory);
 	}
 
+	void WriteMemory(VmaAllocation allocation, void* dataBlock, VkDeviceSize size)
+	{
+		VmaAllocationInfo info;
+		vmaGetAllocationInfo(allocator, allocation, &info);
+		void* data;
+		if (vkMapMemory(device, info.deviceMemory, info.offset, size, 0, &data) != VK_SUCCESS)
+			throw std::runtime_error("failed to map memory");
+		memcpy(data, dataBlock, size);
+		vkUnmapMemory(device, info.deviceMemory);
+	}
+
+	void ReadMemory(VmaAllocation allocation, void* dataBlock, VkDeviceSize size)
+	{
+		VmaAllocationInfo info;
+		vmaGetAllocationInfo(allocator, allocation, &info);
+		void* data;
+		if (vkMapMemory(device, info.deviceMemory, info.offset, size, 0, &data) != VK_SUCCESS)
+			throw std::runtime_error("failed to map memory");
+		memcpy(dataBlock, data, size);
+		vkUnmapMemory(device, info.deviceMemory);
+	}
+
 	void writeMemoryFromHost()
 	{
-		WriteMemory(storageBufferMemorys[0], target.dump.data(), target.DumpSize());
+		//WriteMemory(storageBufferMemorys[0], target.dump.data(), target.DumpSize());
+		//materials.Dump();
+		//hittables.Dump();
+		//materials.WriteMemory(device, storageBufferMemorys[1], storageBufferMemorys[2]);
+		//hittables.WriteMemory(device, storageBufferMemorys[3], storageBufferMemorys[4]);
+		//WriteMemory(uniformBufferMemory, &camera, sizeof(camera));
+
+		WriteMemory(storageAllocation[0], target.dump.data(), target.DumpSize());
 		materials.Dump();
 		hittables.Dump();
-		materials.WriteMemory(device, storageBufferMemorys[1], storageBufferMemorys[2]);
-		hittables.WriteMemory(device, storageBufferMemorys[3], storageBufferMemorys[4]);
-		WriteMemory(uniformBufferMemory, &camera, sizeof(camera));
+		materials.WriteMemory(device, allocator, storageAllocation[1], storageAllocation[2]);
+		hittables.WriteMemory(device, allocator, storageAllocation[3], storageAllocation[4]);
+		WriteMemory(uniformAllocation, &camera, sizeof(camera));
 	}
 
 	std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts;
@@ -634,7 +589,7 @@ public:
 	void createCommandPool()
 	{
 		VkCommandPoolCreateInfo createInfo = MuVk::commandPoolCreateInfo();
-		createInfo.queueFamilyIndex = computeTransferQueueFamilyIndex.value();
+		createInfo.queueFamilyIndex = queueFamilyIndex.value();
 		if (vkCreateCommandPool(device, &createInfo, nullptr, &commandPool)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to create command pool!");
@@ -642,9 +597,8 @@ public:
 
 
 	VkCommandBuffer commandBuffer;
-	void execute()
+	void createCommandBuffer()
 	{
-		auto start = std::chrono::high_resolution_clock::now();
 		VkCommandBufferAllocateInfo allocInfo = MuVk::commandBufferAllocateInfo();
 		allocInfo.commandBufferCount = 1;
 		allocInfo.commandPool = commandPool;
@@ -652,19 +606,26 @@ public:
 		if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to create command buffer!");
-		
+	}
+
+	void execute(uint32_t sampleStart, uint32_t samples)
+	{
+		auto start = std::chrono::high_resolution_clock::now();
 		VkCommandBufferBeginInfo beginInfo = MuVk::commandBufferBeginInfo();
 		vkBeginCommandBuffer(commandBuffer, &beginInfo);
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
 			0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
+		pushConstantData.samples = samples;
+		pushConstantData.sampleStart = sampleStart;
+
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT,
 			0, sizeof(pushConstantData), &pushConstantData);
 		auto sizeX = static_cast<uint32_t>(target.width / computeShaderProcessUnit + 1);
 		auto sizeY = static_cast<uint32_t>(target.height / computeShaderProcessUnit + 1);
 		std::cout << "WorkX=" << sizeX << ' ' << "WorkY=" << sizeY << std::endl;
-		vkCmdDispatch(commandBuffer, 
+		vkCmdDispatch(commandBuffer,
 			sizeX, //x
 			sizeY, //y
 			1  //z
@@ -676,33 +637,126 @@ public:
 		submitInfo.waitSemaphoreCount = 0;
 		submitInfo.signalSemaphoreCount = 0;
 
-		if (vkQueueSubmit(computeTransferQueue, 1, &submitInfo, VK_NULL_HANDLE)
+		if (vkQueueSubmit(universalQueue, 1, &submitInfo, VK_NULL_HANDLE)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to submit command buffer!");
 
 		//wait the calculation to finish
-		if (vkQueueWaitIdle(computeTransferQueue) != VK_SUCCESS)
+		if (vkQueueWaitIdle(universalQueue) != VK_SUCCESS)
 			throw std::runtime_error("failed to wait queue idle!");
 		auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> delta = end - start;
-		std::cout << "GPU Process Time:" << delta.count() << "s" << std::endl;
+		std::cout << "[" << sampleStart + samples << "/" << pushConstantData.totalSamples << "]"<<"GPU Process Time:" << delta.count() << "s" << std::endl;
+	}
 
-		void* data;
-		vkMapMemory(device, storageBufferMemorys[0], 0, target.DumpSize(), 0, &data);
-		memcpy(target.dump.data(), data, target.DumpSize());
-		vkUnmapMemory(device, storageBufferMemorys[0]);
-		std::ofstream os("./RenderingTarget.ppm");
+	void execute()
+	{		
+		createCommandBuffer();
+		auto restSamples = pushConstantData.totalSamples;
+		auto sampleStart = 0;
+		while (true)
+		{
+			if (restSamples >= maxSamplesForSingleShader)
+			{
+				execute(sampleStart, maxSamplesForSingleShader);
+				restSamples -= maxSamplesForSingleShader;
+				sampleStart += maxSamplesForSingleShader;
+			}
+			else if (restSamples > 0)
+			{
+				execute(sampleStart, restSamples);
+				restSamples = 0;
+			}
+			else 
+			{
+				std::cout << "total:" << pushConstantData.totalSamples << " Done!" << std::endl;
+				break;
+			}
+		}
+		ReadMemory(storageAllocation[0], target.dump.data(), target.DumpSize());
+		//void* data;
+		//vkMapMemory(device, storageBufferMemorys[0], 0, target.DumpSize(), 0, &data);
+		//memcpy(target.dump.data(), data, target.DumpSize());
+		//vkUnmapMemory(device, storageBufferMemorys[0]);
+		std::filesystem::path out("./RenderingTarget.ppm");
+		auto absPath = std::filesystem::absolute(out);
+		std::ofstream os(out);
 		os << target;
+		std::cout << "Output Path:" << absPath << std::endl;
+	}
+
+	GLFWwindow* window;
+	int WIDTH = 800;
+	int HEIGHT = 600;
+
+
+
+	void createWindow()
+	{
+		glfwInit();
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+	}
+
+	VkSurfaceKHR surface;
+	void createSurface()
+	{
+		if (glfwCreateWindowSurface(instance, window, nullptr, &surface)
+			!= VK_SUCCESS)
+			throw std::runtime_error("failed to create surface!");
+	}
+
+	VkSwapchainKHR swapchain;
+	std::vector<VkImage> swapchainImages;
+	void createSwapchain()
+	{
+		auto support = MuVk::Query::querySwapChainSupport(physicalDevice, surface);
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		auto createInfo = MuVk::Utils::fillSwapchainCreateInfo(support, surface, { (uint32_t)width, (uint32_t)height });
+		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		createInfo.queueFamilyIndexCount = VK_QUEUE_FAMILY_IGNORED;
+
+		if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain)
+			!= VK_SUCCESS)
+			throw std::runtime_error("failed to create swapchain!");
+
+		swapchainImages = MuVk::Utils::getSwapchainImages(device, swapchain);
+	}
+
+	void drawFrame()
+	{
+		uint32_t imageIndex;
+		vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, nullptr, nullptr, &imageIndex);
+		{
+			MuVk::Utils::SingleTimeCommandGuard guard(device, universalQueue, commandPool);
+			//vkCmdCopyImage(guard.commandBuffer, storageImage,)
+		}
+	}
+
+	void mainloop()
+	{
+		while (!glfwWindowShouldClose(window))
+		{
+			glfwPollEvents();
+			drawFrame();
+		}
+		vkDeviceWaitIdle(device);
 	}
 
 	void Run()
     {
+		GreatScene();
+		createWindow();
 		createInstance();
+		createSurface();
 		pickPhyscialDevice();
 		createLogicalDevice();
+		createSwapchain();
+		createAllocator();
 		//SetupScene();
-		GreatScene();
-
+		
 		createBuffers();
 		writeMemoryFromHost();
 		createDescriptorSetLayout();
@@ -718,7 +772,7 @@ public:
     }
 
 	void cleanUp()
-	{		
+	{
 		vkDestroyCommandPool(device, commandPool, nullptr);
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 		vkDestroyPipeline(device, computePipeline, nullptr);
@@ -728,31 +782,51 @@ public:
 		
 		for (size_t i = 0; i < storageBuffers.size(); i++)
 		{
-			vkDestroyBuffer(device, storageBuffers[i], nullptr);
-			vkFreeMemory(device, storageBufferMemorys[i], nullptr);
+			vmaDestroyBuffer(allocator, storageBuffers[i], nullptr);
+			vmaFreeMemory(allocator, storageAllocation[i]);
+			//vkDestroyBuffer(device, storageBuffers[i], nullptr);
+			//vkFreeMemory(device, storageBufferMemorys[i], nullptr);
 		}
-
-		vkDestroyBuffer(device, uniformBuffer, nullptr);
-		vkFreeMemory(device, uniformBufferMemory, nullptr);
-
+		vmaDestroyBuffer(allocator, uniformBuffer, nullptr);
+		vmaFreeMemory(allocator, uniformAllocation);
+		//vkDestroyBuffer(device, uniformBuffer, nullptr);
+		//vkFreeMemory(device, uniformBufferMemory, nullptr);
+		vmaDestroyAllocator(allocator);
+		
 		MuVk::Proxy::destoryDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		vkDestroyDevice(device, nullptr);
+		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
+	}
+
+	VmaAllocator allocator;
+
+	void createAllocator()
+	{
+		VmaAllocatorCreateInfo createInfo = {};
+		createInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+		createInfo.instance = instance;
+		createInfo.device = device;
+		createInfo.physicalDevice = physicalDevice;
+
+		if (vmaCreateAllocator(&createInfo, &allocator) != VK_SUCCESS)
+		{
+			std::runtime_error("failed to create allocator");
+		}
 	}
 };
 
 int main()
 {
 	ComputeShaderExample program;
-	std::cout << "Unfixed";
-	return -1;
+	program.Run();
 	try
 	{
-		program.Run();
+		
 	}
 	catch (std::runtime_error)
 	{
-		program.cleanUp();
+		//program.cleanUp();
 	}
 
 }

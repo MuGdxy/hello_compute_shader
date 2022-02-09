@@ -12,9 +12,9 @@ uint xor_shift_rand()
     return state;
 }
 
-void Seed(uvec2 screenCoord, uvec2 screenSize)
+void Seed(uvec2 screenCoord, uvec2 screenSize, uint sampleStart)
 {
-	state = uint(screenCoord.x + (screenCoord.y + 1) * screenSize.x + screenSize.x);
+	state = uint(screenCoord.x + (screenCoord.y + 1) * screenSize.x + screenSize.x * sampleStart);
     stateOrigin = state;
 }
 

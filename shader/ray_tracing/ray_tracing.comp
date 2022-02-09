@@ -12,11 +12,13 @@ const int blockSizeX = 32;
 const int blockSizeY = 32;
 layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
 
-layout(push_constant, std140) uniform PushConstant 
+layout(push_constant, std430) uniform PushConstant 
 {
     ivec2 screenSize;
     uint hittableCount;
+    uint sampleStart;
     uint samples;
+    uint totalSamples;
     uint maxDepth;
 };
 
@@ -25,34 +27,42 @@ layout(set = 0, binding = 0) writeonly buffer TargetBuffer
     vec4 pixels[];
 } target;
 
-layout(set = 0, binding = 1, std140) readonly buffer MaterialBuffer
+layout(set = 0, binding = 1, std430) readonly buffer MaterialBuffer
 {
     Material materials[];
 };
 
-layout(set = 0, binding = 2, std140) readonly buffer MaterialDumpBuffer
+Interface
+void Deref(out Material mat, Pointer ptr) { mat = materials[ptr]; }
+
+layout(set = 0, binding = 2, std430) readonly buffer MaterialDumpBuffer
 {
     vec4 data[];
 } materialData;
 
-layout(set = 0, binding = 3, std140) readonly buffer HittableBuffer
+Interface
+void Deref(Material, out vec4 data, Pointer ptr) { data = materialData.data[ptr];}
+
+layout(set = 0, binding = 3, std430) readonly buffer HittableBuffer
 {
     Hittable hittables[];
 };
 
-layout(set = 0, binding = 4, std140) readonly buffer HittableDumpBuffer
+Interface
+void Deref(out Hittable hittable, Pointer ptr) { hittable = hittables[ptr]; }
+
+layout(set = 0, binding = 4, std430) readonly buffer HittableDumpBuffer
 {
     vec4 data[];
 } hittableData;
 
-layout(set = 1, binding = 0, std140) uniform CameraBuffer
+Interface
+void Deref(Hittable, out vec4 data, Pointer ptr) { data = hittableData.data[ptr];}
+
+layout(set = 1, binding = 0) uniform CameraBuffer
 {
     Camera camera;
 };
-
-bool Hit(Hittable hittable, Ray r, float t_min, float t_max, out HitRecord rec);
-bool Hit(Ray r, float t_min, float t_max, out HitRecord rec);
-bool Scatter(Material self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered);
 
 vec3 BackgroundColor(Ray r);
 void WriteColor(int x, int y, vec3 color);
@@ -66,10 +76,12 @@ vec3 RayColor(Ray r)
     for(int i = 0; i < maxDepth; ++i)
     {
         HitRecord rec;
-        if(Hit(next, 0.001, 10000, rec))
+        if(HitAny(hittableCount, next, 0.001, 10000, rec))
         {
-            vec3 attenuation;   
-            if(Scatter(rec.mat, next, rec, attenuation, next))
+            vec3 attenuation;
+            Material mat;
+            Deref(mat, rec.mat);   
+            if(Scatter(mat, next, rec, attenuation, next))
                 color *= attenuation;
             else return vec3(0);
         }
@@ -81,7 +93,7 @@ vec3 RayColor(Ray r)
 
 void main()
 {
-    Seed(gl_GlobalInvocationID.xy, screenSize);
+    Seed(gl_GlobalInvocationID.xy, screenSize, sampleStart);
 
     if(gl_GlobalInvocationID.x >= screenSize.x
         || gl_GlobalInvocationID.y >= screenSize.y) return;
@@ -92,73 +104,19 @@ void main()
 
     for(int sam = 0; sam < samples; ++sam)
     {
-        float s = (float(i) +Rand()) / (screenSize.x - 1);
+        float s = (float(i) + Rand()) / (screenSize.x - 1);
         float t = (float(screenSize.y - j - 1) + Rand()) / (screenSize.y - 1);
         Ray r = GetRay(camera, s, t);
         color += RayColor(r);
     }
 
-    color /= samples;
+    color /= totalSamples;
+    if(gl_GlobalInvocationID.x == 0 && gl_GlobalInvocationID.y == 0)
+    {
+        debugPrintfEXT("color=(%f,%f,%f), samples = %d", color, samples);
+    }
     WriteColor(i, j, color);
 }
-
-
-bool Scatter(Material self, Ray r, HitRecord rec, out vec3 attenuation, out Ray scattered)
-{
-    switch(self.type)
-    {
-    case MaterialEnum.Lambertian:
-        Lambertian lam;
-        Init(lam, materialData.data[self.ptr].xyz);
-        return Scatter(lam, r, rec, attenuation, scattered);
-    case MaterialEnum.Metal:
-        Metal met;
-        vec4 d = materialData.data[self.ptr];
-        Init(met, d.xyz, d.w);
-        return Scatter(met, r, rec, attenuation, scattered);
-    case MaterialEnum.Dielectrics:
-        Dielectrics dlt;
-        Init(dlt,materialData.data[self.ptr].x);
-        return Scatter(dlt, r, rec, attenuation, scattered);
-    }
-    return false;
-}
-
-bool Hit(Hittable hittable, Ray r, float t_min, float t_max, out HitRecord rec)
-{
-    switch(hittable.type)//disptach
-    {
-    case HittableEnum.Sphere:
-        Sphere s;
-        vec3 center =  hittableData.data[hittable.ptr].xyz;
-        float radius =  hittableData.data[hittable.ptr].w;
-        Init(s, center, radius);
-        return Hit(s, r, t_min, t_max, rec);
-    default:
-        return false;
-    }
-}
-
-bool Hit(Ray r, float t_min, float t_max, out HitRecord rec)
-{
-    HitRecord temp_rec;
-    bool hit_anything = false;
-    float closest_so_far = t_max;
-
-    for (int i = 0; i < hittableCount; ++i) 
-    {
-        Hittable obj = hittables[i];
-        if(Hit(obj, r, t_min, closest_so_far, temp_rec))
-        {
-            hit_anything = true;
-            closest_so_far = temp_rec.t;
-            temp_rec.mat = materials[obj.mat];
-            rec = temp_rec;
-        }
-    }
-    return hit_anything;
-}
-
 
 vec3 BackgroundColor(Ray r) 
 {
@@ -171,6 +129,6 @@ vec3 BackgroundColor(Ray r)
 void WriteColor(int x, int y, vec3 color) 
 { 
     //gamma correct
-    color = sqrt(color);
-    target.pixels[y * screenSize.x + x] = vec4(color,1.0);
+    //color = sqrt(color);
+    target.pixels[y * screenSize.x + x] += vec4(color, 1.0);
 }

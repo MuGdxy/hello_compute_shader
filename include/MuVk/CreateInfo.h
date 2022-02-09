@@ -129,6 +129,13 @@ namespace MuVk
 		return renderPassCreateInfo;
 	}
 
+	inline 	VkSwapchainCreateInfoKHR swapchainCreateInfo()
+	{
+		VkSwapchainCreateInfoKHR createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		return createInfo;
+	}
+
 	inline VkBufferCreateInfo bufferCreateInfo()
 	{
 		VkBufferCreateInfo bufCreateInfo{};
@@ -219,6 +226,13 @@ namespace MuVk
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		return submitInfo;
+	}
+
+	inline VkPresentInfoKHR presentInfoKHR()
+	{
+		VkPresentInfoKHR presentInfo{};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		return presentInfo;
 	}
 
 	inline VkViewport viewport(

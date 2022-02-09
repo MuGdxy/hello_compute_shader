@@ -2,6 +2,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
+#include <vulkan/vk_mem_alloc.h>
 
 using color = glm::vec3;
 using point3 = glm::vec3;
@@ -12,6 +13,7 @@ class TargetBuffer
 public:
 	size_t width;
 	size_t height;
+	bool gammaCorrectOnOutput = true;
 	TargetBuffer() {};
 
 	TargetBuffer(size_t width, size_t height)
@@ -23,8 +25,10 @@ public:
 	friend std::ostream& operator << (std::ostream& out, TargetBuffer& buffer)
 	{
 		out << "P3\n" << buffer.width << ' ' << buffer.height << "\n255\n";
-		for (const auto& pixel : buffer.dump)
+		for (auto pixel : buffer.dump)
 		{
+			pixel.w = 1.0f;
+			if (buffer.gammaCorrectOnOutput) pixel = glm::sqrt(pixel);
 			out << (int)(256 * glm::clamp(pixel.x, 0.0f, 0.999f)) << ' '
 				<< (int)(256 * glm::clamp(pixel.y, 0.0f, 0.999f)) << ' '
 				<< (int)(256 * glm::clamp(pixel.z, 0.0f, 0.999f)) << '\n';
@@ -64,6 +68,7 @@ public:
 		float aperture,
 		float focus_dist)
 	{
+		sizeof(Camera);
 		const auto offset = offsetof(Camera, viewportHeight);
 		float theta = glm::radians(vfov);
 		float h = glm::tan(theta / 2);
@@ -89,7 +94,9 @@ struct PushConstantData
 {
 	glm::ivec2 screenSize;
 	uint32_t hittableCount;
+	uint32_t sampleStart;
 	uint32_t samples;
+	uint32_t totalSamples;
 	uint32_t maxDepth;
 };
 
@@ -134,6 +141,12 @@ public:
 		WriteMemory(device, headMemory, heads.data(), HeadSize());
 		WriteMemory(device, dumpMemory, dump.data(), DumpSize());
 	}
+
+	void WriteMemory(VkDevice device, VmaAllocator allocator, VmaAllocation headAlloc, VmaAllocation dumpAlloc)
+	{
+		WriteMemory(device, allocator, headAlloc, heads.data(), HeadSize());
+		WriteMemory(device, allocator, dumpAlloc, dump.data(), DumpSize());
+	}
 private:
 	void WriteMemory(VkDevice device, VkDeviceMemory memory, void* dataBlock, VkDeviceSize size)
 	{
@@ -142,6 +155,17 @@ private:
 			throw std::runtime_error("failed to map memory");
 		memcpy(data, dataBlock, size);
 		vkUnmapMemory(device, memory);
+	}
+
+	void WriteMemory(VkDevice device, VmaAllocator allocator, VmaAllocation allocation, void* dataBlock, VkDeviceSize size)
+	{
+		VmaAllocationInfo info;
+		vmaGetAllocationInfo(allocator, allocation, &info);
+		void* data;
+		if (vkMapMemory(device, info.deviceMemory, info.offset, size, 0, &data) != VK_SUCCESS)
+			throw std::runtime_error("failed to map memory");
+		memcpy(data, dataBlock, size);
+		vkUnmapMemory(device, info.deviceMemory);
 	}
 };
 

@@ -5,6 +5,38 @@
 #include "Random.comph"
 #include "Material.comph"
 
+bool Scatter(Material self, Ray r, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    switch(self.type)
+    {
+    case MaterialEnum.Lambertian:
+    {
+        Lambertian lam;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        Init(lam, data.xyz);
+        return Scatter(lam, r, rec, attenuation, scattered);
+    }
+    case MaterialEnum.Metal:
+    {
+        Metal met;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        Init(met, data.xyz, data.w);
+        return Scatter(met, r, rec, attenuation, scattered);
+    }
+    case MaterialEnum.Dielectrics:
+    {
+        Dielectrics dlt;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        Init(dlt, data.x);
+        return Scatter(dlt, r, rec, attenuation, scattered);
+    }
+    }
+    return false;
+}
+
 void Init(inout Lambertian self, vec3 albedo) { self.albedo = albedo; }
 bool near_zero(vec3 v) 
 {

@@ -2,11 +2,13 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <iostream>
+#include <set>
 //#include <functional>
 namespace MuVk
 {
 	struct Query
 	{
+		_NODISCARD
 		static std::vector<VkExtensionProperties> instanceExtensionProperties()
 		{
 			uint32_t extensionCount = 0;
@@ -15,7 +17,7 @@ namespace MuVk
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, ext.data());
 			return ext;
 		}
-
+		_NODISCARD
 		static std::vector<VkPhysicalDevice> physicalDevices(VkInstance instance)
 		{
 			uint32_t deviceCount;
@@ -24,22 +26,22 @@ namespace MuVk
 			vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 			return devices;
 		}
-
+		_NODISCARD
 		static VkPhysicalDeviceProperties physicalDeviceProperties(VkPhysicalDevice device)
 		{
 			VkPhysicalDeviceProperties properties;
 			vkGetPhysicalDeviceProperties(device, &properties);
 			return properties;
 		}
-
+		_NODISCARD
 		static VkPhysicalDeviceFeatures physicalDevicePropertiesfeatures(VkPhysicalDevice device)
 		{
 			VkPhysicalDeviceFeatures features;
 			vkGetPhysicalDeviceFeatures(device, &features);
 			return features;
 		}
-
-		static std::vector<VkQueueFamilyProperties> queueFamilies(VkPhysicalDevice device)
+		_NODISCARD
+		static std::vector<VkQueueFamilyProperties> physicalDeviceQueueFamilyProperties(VkPhysicalDevice device)
 		{
 			uint32_t propertyCount;
 			vkGetPhysicalDeviceQueueFamilyProperties(device, &propertyCount, nullptr);
@@ -47,135 +49,118 @@ namespace MuVk
 			vkGetPhysicalDeviceQueueFamilyProperties(device, &propertyCount, queueFamilies.data());
 			return queueFamilies;
 		}
-
-		static VkMemoryRequirements memoryRequirements(VkDevice device, VkBuffer buffer)
+		_NODISCARD
+		static std::vector<VkExtensionProperties> deviceExtensionProperties(VkPhysicalDevice device)
 		{
-			VkMemoryRequirements memoryRequirements;
-			vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
-			return memoryRequirements;
+			uint32_t extensionCount;
+			vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+			std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+			vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+			return availableExtensions;
 		}
-
+		_NODISCARD
 		static VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties(VkPhysicalDevice device)
 		{
 			VkPhysicalDeviceMemoryProperties memoryProperties;
 			vkGetPhysicalDeviceMemoryProperties(device, &memoryProperties);
 			return memoryProperties;
 		}
+		_NODISCARD
+		static VkMemoryRequirements memoryRequirements(VkDevice device, VkBuffer buffer)
+		{
+			VkMemoryRequirements memoryRequirements;
+			vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
+			return memoryRequirements;
+		}
+		
+		struct SwapChainSupportDetails
+		{
+			VkSurfaceCapabilitiesKHR capabilities;
+			std::vector<VkSurfaceFormatKHR> formats;
+			std::vector<VkPresentModeKHR> presentModes;
+		};
+		_NODISCARD
+		static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
+		{
+			SwapChainSupportDetails details;
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+			uint32_t formatCount;
+			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+			if (formatCount > 0)
+			{
+				details.formats.resize(formatCount);
+				vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+			}
+			uint32_t presentModeCount;
+			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+			if (presentModeCount > 0)
+			{
+				details.presentModes.resize(presentModeCount);
+				vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+			}
+			return details;
+		}
+		_NODISCARD
+		static bool checkDeviceExtensionSupport(VkPhysicalDevice device, std::vector<std::string>& requiredExtensions)
+		{
+			auto availableExtensions = deviceExtensionProperties(device);
+			std::set<std::string> extensions(requiredExtensions.begin(), requiredExtensions.end());
+			for (const auto& extension : availableExtensions)
+				extensions.erase(extension.extensionName);
+			return requiredExtensions.empty();
+		}
+		_NODISCARD
+		static VkSurfaceFormatKHR chooseSwapSurfaceFormat(
+				const std::vector<VkSurfaceFormatKHR>& availableFormats,
+				VkFormat format = VK_FORMAT_B8G8R8A8_SRGB,
+				VkColorSpaceKHR colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			for (const auto& availableFormat : availableFormats)
+			{
+				if (availableFormat.format == format
+					&& availableFormat.colorSpace == colorSpace)
+						return availableFormat;
+			}
+			return availableFormats[0];
+		}
 
+		_NODISCARD
+		static VkPresentModeKHR chooseSwapPresentMode(
+			const std::vector<VkPresentModeKHR>& availablePresentModes,
+			VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR)
+		{
+			for (const auto& availablePresentMode : availablePresentModes)
+			{
+				if (availablePresentMode == presentMode)
+					return availablePresentMode;
+			}
+			return VK_PRESENT_MODE_FIFO_KHR;
+		}
+
+		_NODISCARD
+		static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, VkExtent2D actualExtent)
+		{
+			if (capabilities.currentExtent.width != UINT32_MAX)
+				return capabilities.currentExtent;
+			else
+			{
+				actualExtent.width = std::max(capabilities.minImageExtent.width,
+					std::min(capabilities.maxImageExtent.width, actualExtent.width));
+				actualExtent.height = std::max(capabilities.minImageExtent.height,
+					std::min(capabilities.maxImageExtent.height, actualExtent.height));
+				return actualExtent;
+			}
+		}
+
+		_NODISCARD
+		static uint32_t chooseSwapchainImageCount(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t expectedCount = -1)
+		{
+			if (expectedCount == -1 || expectedCount <= capabilities.minImageCount)
+				expectedCount = capabilities.minImageCount + 1;
+			//capabilities.maxImageCount == 0 for no maximum
+			if (capabilities.maxImageCount > 0 && expectedCount > capabilities.maxImageCount)
+				expectedCount = capabilities.maxImageCount;
+			return expectedCount;
+		}
 	};
-}
-
-static struct tabs
-{
-	int t;
-	tabs(int i):t(i){}
-
-	friend std::ostream& operator << (std::ostream& o, const tabs& t)
-	{
-		for (int i = 0; i < t.t; ++i) o << '\t';
-		return o;
-	}
-};
-
-inline std::ostream& operator << (std::ostream& o, const std::vector<VkExtensionProperties>& properties)
-{
-	o << "available extensions:";
-	tabs t(1);
-	for (const auto& extension : properties)
-	{
-		std::cout
-			<< "\n"<< t << extension.extensionName
-			<< "<Version=" << extension.specVersion << ">";
-	}
-	return o;
-}
-
-inline std::ostream& operator << (std::ostream& o, VkPhysicalDevice device)
-{
-	auto properties = MuVk::Query::physicalDeviceProperties(device);
-	o << properties.deviceName;
-	return o;
-}
-
-inline std::ostream& operator << (std::ostream& o, const std::vector<VkPhysicalDevice>& devices)
-{
-	o << "physical devices:";
-	int index = 0;
-	tabs t(1);
-	for (const auto& device : devices)
-		std::cout << "\n" << t << "["<< index++ << "] " << device;
-	return o;
-}
-
-inline std::ostream& operator << (std::ostream& o, const std::vector<VkQueueFamilyProperties>& families)
-{
-	o << "queue families:";
-	auto presentFlags = [](std::ostream& o, VkQueueFlags flags)
-	{
-
-		o << tabs(1) << "Flags:";
-		if (flags & VkQueueFlagBits::VK_QUEUE_GRAPHICS_BIT) o << "[Graphics]";
-		if (flags & VkQueueFlagBits::VK_QUEUE_COMPUTE_BIT) o << "[Compute]";
-		if (flags & VkQueueFlagBits::VK_QUEUE_TRANSFER_BIT) o << "[Transfer]";
-		if (flags & VkQueueFlagBits::VK_QUEUE_SPARSE_BINDING_BIT) o << "[Sparse Binding]";
-	};
-	int index = 0;
-	tabs t(1);
-	for (const auto& family : families)
-	{
-		o << "\n" << t << "family index=" << index++;
-		o << "\n" << t << "Queue Count=" << family.queueCount << "\n";
-		presentFlags(o, family.queueFlags);
-	}
-	return o;
-}
-
-inline std::ostream& operator << (std::ostream& o, const VkMemoryRequirements& requirements)
-{
-	tabs t(1);
-	o << "memory requirements:\n";
-	o << t << "alignment=" << requirements.alignment << "\n";
-	o << t << "size=" << requirements.size << "\n";
-	o << t << "type bits=0x" << std::uppercase << std::hex << requirements.memoryTypeBits << std::dec;
-	return o;
-}
-
-inline std::ostream& operator << (std::ostream& o, const VkPhysicalDeviceMemoryProperties& properties)
-{
-	auto presentType = [](std::ostream& o, const VkMemoryType& type)
-	{
-		tabs t(1);
-		o << t << "heap index=" << type.heapIndex << "\n";
-		o << t << "propertyFlags: ";
-		if (type.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) o << "[Device Local]";
-		if (type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) o << "[Host Visible]";
-		if (type.propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) o << "[Host Coherent]";
-		if (type.propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) o << "[Host Cached]";
-		if (type.propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) o << "[Lazily Allocated]";
-	};
-
-	auto presentHeap = [](std::ostream& o, const VkMemoryHeap& heap)
-	{
-		tabs t(1);
-		o << t << "heap size=" << heap.size << "\n";
-		o << t << "heap flags: ";
-		if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) o << "[Device Local]";
-		if (heap.flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT) o << "[Multi Instance]";
-	};
-
-	o << "memory type:\n";
-	for (size_t i = 0; i < properties.memoryTypeCount; ++i)
-	{
-		o << "[" << i << "]:\n";
-		presentType(o, properties.memoryTypes[i]);
-		o << std::endl;
-	}
-	o << "memory heap:\n";
-	for (size_t i = 0; i < properties.memoryHeapCount; ++i)
-	{
-		o << "[" << i << "]:\n";
-		presentHeap(o, properties.memoryHeaps[i]);
-		o << std::endl;
-	}
-	return o;
 }

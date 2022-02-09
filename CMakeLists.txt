@@ -49,6 +49,15 @@ add_executable(
     ${MuVkHeaders}
 )
 
+add_executable(
+    CSRT-vma
+    "src/CSRT-vma/main.cpp"
+    "src/CSRT-vma/DataDump.h"
+    "src/CSRT-vma/testVma.cpp"
+    "src/VmaUsage.cpp"
+    ${MuVkHeaders}
+)
+target_link_libraries(CSRT-vma glfw3.lib)
 
 
 
