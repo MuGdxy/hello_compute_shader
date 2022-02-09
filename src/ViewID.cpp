@@ -9,15 +9,20 @@
 
 class ComputeShaderExample
 {
-	std::array<float, 1024> inputData;
-	std::array<float, 1024> outputData;
+	struct GlobalLocal
+	{
+		int global;
+		int local;
+	};
+	std::array<GlobalLocal, 1024> inputData;
+	std::array<GlobalLocal, 1024> outputData;
 	constexpr VkDeviceSize inputDataSize() { return sizeof(inputData); }
 	constexpr uint32_t computeShaderProcessUnit() { return 256; }
 public:
 	ComputeShaderExample()
 	{
-		inputData.fill(1.0f);
-		outputData.fill(0.0f);
+		inputData.fill({0,0});
+		outputData.fill({0,0});
 	}
 
 	VkInstance instance;
@@ -90,7 +95,6 @@ public:
 		else
 		{
 			std::cout << "Select Physical Device:" << physicalDevice << std::endl;
-			std::cout << MuVk::Query::DeviceExtensionProperties(physicalDevice, nullptr) << std::endl;
 			std::cout << "Select Queue Index:" << computeTransferQueueFamilyIndex.value() << std::endl;
 		}
 	}
@@ -130,8 +134,9 @@ public:
 		createInfo.size = inputDataSize();
 		createInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 		createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		createInfo.queueFamilyIndexCount = 0;
-		createInfo.pQueueFamilyIndices = nullptr;
+		createInfo.queueFamilyIndexCount = 1;
+		createInfo.pQueueFamilyIndices = &computeTransferQueueFamilyIndex.value();
+		createInfo.pNext = nullptr;
 		if (vkCreateBuffer(device, &createInfo, nullptr, &storageBuffer) != VK_SUCCESS)
 			throw std::runtime_error("failed to create storage buffer!");
 
@@ -173,6 +178,7 @@ public:
 	}
 
 	VkDescriptorSetLayout descriptorSetLayout;
+
 	void createDescriptorSetLayout()
 	{
 		VkDescriptorSetLayoutBinding binding;
@@ -206,7 +212,7 @@ public:
 	VkPipeline computePipeline;
 	void createComputePipeline()
 	{
-		auto computeShaderCode = MuVk::readFile(MU_SHADER_PATH "multiply.spv");
+		auto computeShaderCode = MuVk::readFile(MU_SHADER_PATH "view_id.spv");
 		auto computeShaderModule = createShaderModule(computeShaderCode);
 		VkPipelineShaderStageCreateInfo shaderStageCreateInfo = MuVk::pipelineShaderStageCreateInfo();
 		shaderStageCreateInfo.module = computeShaderModule;
@@ -290,13 +296,6 @@ public:
 	VkCommandBuffer commandBuffer;
 	void execute()
 	{
-		std::cout << "input data:\n";
-		for (size_t i = 0; i < inputData.size(); ++i)
-		{
-			if (i % 64 == 0 && i != 0) std::cout << '\n';
-			std::cout << inputData[i];
-		}
-		std::cout << "\n";
 		VkCommandBufferAllocateInfo allocInfo = MuVk::commandBufferAllocateInfo();
 		allocInfo.commandBufferCount = 1;
 		allocInfo.commandPool = commandPool;
@@ -311,7 +310,7 @@ public:
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
 			0, 1, &descriptorSet, 0, nullptr);
 		vkCmdDispatch(commandBuffer, 
-			static_cast<uint32_t>(inputData.size() / computeShaderProcessUnit()), //x
+			static_cast<uint32_t>(inputData.size()) / computeShaderProcessUnit(), //x
 			1, //y
 			1  //z
 		);
@@ -335,8 +334,8 @@ public:
 		std::cout << "output data:\n";
 		for (size_t i = 0; i < outputData.size(); ++i)
 		{
-			if (i % 64 == 0 && i != 0) std::cout << '\n';
-			std::cout << outputData[i];
+			if (i % 8 == 0 && i != 0) std::cout << '\n';
+			std::cout << "[" << outputData[i].global << "," << outputData[i].local << "] ";
 		}
 	}
 

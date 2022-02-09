@@ -6,7 +6,7 @@ namespace MuVk
 {
 	struct Proxy
 	{
-		static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
+		static VkResult createDebugUtilsMessengerEXT(VkInstance instance,
 			const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 			const VkAllocationCallbacks* pAllocator,
 			VkDebugUtilsMessengerEXT* pDebugMessenger)
@@ -14,10 +14,10 @@ namespace MuVk
 			auto func = (PFN_vkCreateDebugUtilsMessengerEXT)
 				vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 			if (func) return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-			else return VK_ERROR_EXTENSION_NOT_PRESENT;
+			else throw std::runtime_error("can't find proc");
 		}
 
-		static void DestoryDebugUtilsMessengerEXT(VkInstance instance,
+		static void destoryDebugUtilsMessengerEXT(VkInstance instance,
 			VkDebugUtilsMessengerEXT messenger, const VkAllocationCallbacks* pAllocator)
 		{
 			auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)

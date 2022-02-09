@@ -1,0 +1,14 @@
+#ifndef MU_HIT_RECORD
+#define MU_HIT_RECORD
+#include "Ray.comph"
+struct HitRecord 
+{
+    vec3 p;
+    vec3 normal;
+    float t;
+    bool frontFace;
+    uint mat;
+};
+
+void SetFaceNormal(inout HitRecord self, Ray r, vec3 outwardNormal);
+#endif

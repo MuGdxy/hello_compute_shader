@@ -1,0 +1,110 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#extension GL_EXT_debug_printf : enable
+
+#include "Random.comph"
+#include "Material.comph"
+
+bool Scatter(Material self, Ray r, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    switch(self.type)
+    {
+    case MaterialEnum.Lambertian:
+    {
+        Lambertian lam;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        Init(lam, data.xyz);
+        return Scatter(lam, r, rec, attenuation, scattered);
+    }
+    case MaterialEnum.Metal:
+    {
+        Metal met;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        Init(met, data.xyz, data.w);
+        return Scatter(met, r, rec, attenuation, scattered);
+    }
+    case MaterialEnum.Dielectrics:
+    {
+        Dielectrics dlt;
+        vec4 data;
+        Deref(self, data, self.ptr);
+        Init(dlt, data.x);
+        return Scatter(dlt, r, rec, attenuation, scattered);
+    }
+    }
+    return false;
+}
+
+void Init(inout Lambertian self, vec3 albedo) { self.albedo = albedo; }
+bool near_zero(vec3 v) 
+{
+    // Return true if the vector is close to zero in all dimensions.
+    const float s = 1e-8;
+    return (abs(v[0]) < s) && (abs(v[1]) < s) && (abs(v[2]) < s);
+}
+
+bool Scatter(Lambertian self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    //vec3 scatter_direction = rec.p + RandSemiUnitBall(rec.normal);
+    vec3 scatter_direction = rec.normal + RandUnitBall();
+    if (near_zero(scatter_direction)) scatter_direction = rec.normal;
+    Init(scattered, rec.p, scatter_direction);
+    attenuation = self.albedo;
+    return true;
+}
+
+void Init(inout Metal self, vec3 albedo, float fuzz)
+{
+    self.albedo = albedo;
+    self.fuzz = fuzz;
+}
+
+bool Scatter(Metal self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    vec3 dir = reflect(r_in.direction, rec.normal);
+    Init(scattered,
+        rec.p, dir + self.fuzz * RandUnitBall());
+    attenuation = self.albedo;
+    return dot(scattered.direction, rec.normal) > 0;
+}
+
+
+void Init(inout Dielectrics self, float ir) { self.ir = ir; }
+
+vec3 Refract(vec3 uv, vec3 n, float etai_over_etat) {
+    float cos_theta = min(dot(-uv, n), 1.0);
+    vec3 r_out_perp =  etai_over_etat * (uv + cos_theta*n);
+    vec3 r_out_parallel = -sqrt(abs(1.0 - dot(r_out_perp, r_out_perp))) * n;
+    return r_out_perp + r_out_parallel;
+}
+
+float Reflectance(float cosine, float ref_idx)
+{
+    // Use Schlick's approximation for reflectance.
+    float r0 = (1 - ref_idx) / (1 + ref_idx);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * pow((1 - cosine), 5);
+}
+
+bool Scatter(Dielectrics self, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered)
+{
+    attenuation = vec3(1.0, 1.0, 1.0);
+    float refraction_ratio = rec.frontFace ? (1.0 / self.ir) : self.ir;
+    vec3 dir = r_in.direction;
+    
+    float cos_theta = min(dot(-dir, rec.normal), 1.0);
+    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+    vec3 direction;
+
+    if (cannot_refract || Reflectance(cos_theta, refraction_ratio) > Rand())
+        direction = reflect(dir, rec.normal);
+    else
+        direction = refract(dir, rec.normal, refraction_ratio);
+    
+    Init(scattered, rec.p, direction);
+    return true;
+}

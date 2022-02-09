@@ -1,0 +1,38 @@
+#ifndef MU_RTX
+#define MU_RTX
+
+uint state;
+uint xor_shift_rand();
+void Seed(uvec2 screenCoord, uvec2 screenSize);
+float Rand();
+#endif
+
+#ifdef MU_RTX_IMPLEMENTATION
+
+#ifdef MU_RTX_IMPLEMENTATION_ONCE
+#error implementation only allows including once
+#else
+#define MU_RTX_IMPLEMENTATION_ONCE
+#endif
+
+uint xor_shift_rand()
+{
+    state ^= (state << 13);
+    state ^= (state >> 17);
+    state ^= (state << 5);
+    return state;
+}
+
+void Seed(uvec2 screenCoord, uvec2 screenSize)
+{
+	state = uint(screenCoord.x * screenSize.x 
+        + screenCoord.y * screenSize.x * screenSize.y);
+}
+
+float Rand() { return float(xor_shift_rand()) * (1.0 / 4294967296.0); }
+
+vec2 RandVec2() { return vec2(Rand(),Rand()); }
+
+vec3 RandVec3() { return vec3(RandVec2(),Rand()); }
+
+#endif

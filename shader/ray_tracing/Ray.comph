@@ -1,0 +1,10 @@
+#ifndef MU_RAY
+#define MU_RAY
+struct Ray
+{
+    vec3    origin;
+    vec3    direction;
+};
+void Init(inout Ray self, vec3 origin, vec3 direction);
+vec3 At(Ray self, float t);
+#endif

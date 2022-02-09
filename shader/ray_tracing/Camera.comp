@@ -1,0 +1,17 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "Random.comph"
+#include "Camera.comph"
+
+Ray GetRay(Camera self, float s, float t)
+{
+    vec3 rd = self.lensRadius * vec3(RandDisk(),0);
+    vec3 offset = self.u * rd.x + self.v * rd.y;
+    Ray r;
+    Init(r, self.origin + offset, 
+        self.lowerLeftCorner 
+        + s*self.horizontal
+        + t*self.vertical
+        - self.origin - offset);
+    return r;
+}

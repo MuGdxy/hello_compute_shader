@@ -1,0 +1,11 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "Ray.comph"
+
+void Init(inout Ray self, vec3 origin, vec3 direction)
+{
+    self.origin = origin;
+    self.direction = normalize(direction);
+}
+
+vec3 At(Ray self, float t) { return self.origin + self.direction * t; }

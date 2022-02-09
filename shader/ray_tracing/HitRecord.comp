@@ -1,0 +1,8 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#include "HitRecord.comph"
+void SetFaceNormal(inout HitRecord self, Ray r, vec3 outwardNormal) 
+{
+    self.frontFace = dot(r.direction, outwardNormal) < 0;
+    self.normal = self.frontFace ? outwardNormal :-outwardNormal;
+}

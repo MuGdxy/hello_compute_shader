@@ -1,0 +1,40 @@
+#ifndef MU_SPHERE
+#define MU_SPHERE
+#include "PointerEx.Comph"
+#include "Ray.comph"
+#include "HitRecord.comph"
+
+const struct
+{
+    uint None;
+    uint TriangleMesh;
+    uint Sphere;
+} HittableEnum = {0,1,2};
+
+struct Hittable
+{
+    uint type;
+    uint ptr;
+    uint mat;
+};
+
+struct Sphere
+{
+    vec3    center;
+    float   radius;
+};
+
+Interface
+void Deref(out Hittable hittable, Pointer ptr);
+Interface
+void Deref(Hittable, out vec4 data, Pointer ptr);
+
+//entrance
+bool HitAny(uint count, Ray r, float t_min, float t_max, out HitRecord rec);
+
+//disptacher
+bool Hit(Hittable hittable, Ray r, float t_min, float t_max, out HitRecord rec);
+
+void Init(inout Sphere self, vec3 center, float radius);
+bool Hit(Sphere self, Ray r, float t_min, float t_max, out HitRecord rec);
+#endif
