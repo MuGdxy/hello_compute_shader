@@ -20,7 +20,8 @@ namespace MuVk
 		if (messageSeverity >= VkDebugUtilsMessageSeverityFlagBitsEXT::VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 		{
 			std::cerr << "validation layer:\n\t" << pCallbackData->pMessage << "\n" << std::endl;
-			__debugbreak();
+			//__debugbreak();
+			throw std::runtime_error("fatal error!");
 		}
 		//if(messageType == VK_DEBUG_REPORT_INFORMATION_BIT_EXT)
 		//{

@@ -6,7 +6,7 @@
 
 namespace MuVk
 {
-	std::vector<char> readFile(const std::string& filename)
+	inline std::vector<char> readFile(const std::string& filename)
 	{
 		//at end
 		std::ifstream file(filename, std::ios::ate | std::ios::binary);

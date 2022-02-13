@@ -1,0 +1,134 @@
+#version 450
+#extension GL_GOOGLE_include_directive: enable
+#extension GL_EXT_debug_printf : enable
+
+#include "Random.comph"
+#include "Ray.comph"
+#include "Material.comph"
+#include "Hittable.comph"
+#include "Camera.comph"
+
+const int blockSizeX = 32;
+const int blockSizeY = 32;
+layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
+
+layout(push_constant, std430) uniform PushConstant 
+{
+    ivec2 screenSize;
+    uint hittableCount;
+    uint sampleStart;
+    uint samples;
+    uint totalSamples;
+    uint maxDepth;
+};
+
+layout(set = 0, binding = 0) writeonly buffer TargetBuffer
+{
+    vec4 pixels[];
+} target;
+
+layout(set = 0, binding = 1, std430) readonly buffer MaterialBuffer
+{
+    Material materials[];
+};
+
+Interface
+void Deref(out Material mat, Pointer ptr) { mat = materials[ptr]; }
+
+layout(set = 0, binding = 2, std430) readonly buffer MaterialDumpBuffer
+{
+    vec4 data[];
+} materialData;
+
+Interface
+void Deref(Material, out vec4 data, Pointer ptr) { data = materialData.data[ptr];}
+
+layout(set = 0, binding = 3, std430) readonly buffer HittableBuffer
+{
+    Hittable hittables[];
+};
+
+Interface
+void Deref(out Hittable hittable, Pointer ptr) { hittable = hittables[ptr]; }
+
+layout(set = 0, binding = 4, std430) readonly buffer HittableDumpBuffer
+{
+    vec4 data[];
+} hittableData;
+
+Interface
+void Deref(Hittable, out vec4 data, Pointer ptr) { data = hittableData.data[ptr];}
+
+layout(set = 1, binding = 0) uniform CameraBuffer
+{
+    Camera camera;
+};
+
+vec3 BackgroundColor(Ray r);
+void WriteColor(int x, int y, vec3 color);
+
+vec3 RayColor(Ray r)
+{
+    vec3 color = vec3(1.0);
+    Ray next = r;
+    int x = 0;
+
+    for(int i = 0; i < maxDepth; ++i)
+    {
+        HitRecord rec;
+        if(HitAny(hittableCount, next, 0.001, 10000, rec))
+        {
+            vec3 attenuation;
+            Material mat;
+            Deref(mat, rec.mat);   
+            if(Scatter(mat, next, rec, attenuation, next))
+                color *= attenuation;
+            else return vec3(0);
+        }
+        else return color * BackgroundColor(next);
+    }
+    return vec3(0);
+}
+
+
+void main()
+{
+    Seed(gl_GlobalInvocationID.xy, screenSize, sampleStart);
+
+    if(gl_GlobalInvocationID.x >= screenSize.x
+        || gl_GlobalInvocationID.y >= screenSize.y) return;
+    int i = int(gl_GlobalInvocationID.x);
+    int j = int(gl_GlobalInvocationID.y);
+
+    vec3 color = vec3(0);
+
+    for(int sam = 0; sam < samples; ++sam)
+    {
+        float s = (float(i) + Rand()) / (screenSize.x - 1);
+        float t = (float(screenSize.y - j - 1) + Rand()) / (screenSize.y - 1);
+        Ray r = GetRay(camera, s, t);
+        color += RayColor(r);
+    }
+
+    color /= totalSamples;
+    if(gl_GlobalInvocationID.x == 0 && gl_GlobalInvocationID.y == 0)
+    {
+        debugPrintfEXT("color=(%f,%f,%f), samples = %d", color, samples);
+    }
+    WriteColor(i, j, color);
+}
+
+vec3 BackgroundColor(Ray r) 
+{
+    vec3 dir = r.direction;
+    float t = 0.5*(dir.y + 1.0);
+    return mix(vec3(1.0,1.0,1.0),vec3(209.0/255.0,227.0/255.0,254.0/255.0), t);
+}
+
+
+void WriteColor(int x, int y, vec3 color) 
+{ 
+    //gamma correct
+    //color = sqrt(color);
+    target.pixels[y * screenSize.x + x] += vec4(color, 1.0);
+}

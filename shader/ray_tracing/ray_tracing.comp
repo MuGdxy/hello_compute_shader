@@ -59,6 +59,8 @@ layout(set = 0, binding = 4, std430) readonly buffer HittableDumpBuffer
 Interface
 void Deref(Hittable, out vec4 data, Pointer ptr) { data = hittableData.data[ptr];}
 
+layout (set = 0, binding = 5, rgba8) uniform image2D resultImage;
+
 layout(set = 1, binding = 0) uniform CameraBuffer
 {
     Camera camera;
@@ -116,6 +118,8 @@ void main()
         debugPrintfEXT("color=(%f,%f,%f), samples = %d", color, samples);
     }
     WriteColor(i, j, color);
+    vec4 old = imageLoad(resultImage, ivec2(gl_GlobalInvocationID.xy));
+    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(old.xyz + color, 1.0));
 }
 
 vec3 BackgroundColor(Ray r) 

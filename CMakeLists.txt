@@ -18,27 +18,10 @@ include_directories(
 
 add_definitions(-DMU_SHADER_PATH="${CMAKE_SOURCE_DIR}/shader/")
 link_libraries("vulkan-1.lib")
+
 add_executable(
     MultiplyComputeShader
     "src/Multiply.cpp"
-    ${MuVkHeaders}
-)
-
-add_executable(
-    MultiplyComputeShaderHomework
-    "homework/Multiply.cpp"
-    ${MuVkHeaders}
-)
-
-add_executable(
-    ViewID
-    "src/ViewID.cpp"
-    ${MuVkHeaders}
-)
-
-add_executable(
-    PhysicalDeviceProperties
-    "src/PhysicalDeviceProperties.cpp"
     ${MuVkHeaders}
 )
 
@@ -48,16 +31,6 @@ add_executable(
     "src/ComputeShaderRayTracing/DataDump.h"
     ${MuVkHeaders}
 )
-
-add_executable(
-    CSRT-vma
-    "src/CSRT-vma/main.cpp"
-    "src/CSRT-vma/DataDump.h"
-    "src/CSRT-vma/testVma.cpp"
-    "src/VmaUsage.cpp"
-    ${MuVkHeaders}
-)
-target_link_libraries(CSRT-vma glfw3.lib)
 
 
 

@@ -56,7 +56,7 @@ public:
 		if (result != VkResult::VK_SUCCESS)
 			throw std::runtime_error("failed to create instance");
 
-		if (MuVk::Proxy::CreateDebugUtilsMessengerEXT(
+		if (MuVk::Proxy::createDebugUtilsMessengerEXT(
 			instance, &debugCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS)
 			throw std::runtime_error("failed to setup debug messenger");
 	}
@@ -71,7 +71,7 @@ public:
 		std::cout << physicalDevices << std::endl;
 		for (const auto device : physicalDevices)
 		{
-			auto queueFamilies = MuVk::Query::queueFamilies(device);
+			auto queueFamilies = MuVk::Query::physicalDeviceQueueFamilyProperties(device);
 			std::cout << queueFamilies << std::endl;
 			for (size_t i = 0; i < queueFamilies.size(); ++i)
 			{
@@ -371,7 +371,7 @@ public:
 		vkDestroyBuffer(device, storageBuffer, nullptr);
 		vkFreeMemory(device, storageBufferMemory, nullptr);
 
-		MuVk::Proxy::DestoryDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+		MuVk::Proxy::destoryDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		vkDestroyDevice(device, nullptr);
 		vkDestroyInstance(instance, nullptr);
 	}
