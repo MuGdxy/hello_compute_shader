@@ -18,6 +18,7 @@ include_directories(
 
 add_definitions(-DMU_SHADER_PATH="${CMAKE_SOURCE_DIR}/shader/")
 link_libraries("vulkan-1.lib")
+
 add_executable(
     MultiplyComputeShader
     "src/Multiply.cpp"
@@ -27,6 +28,12 @@ add_executable(
 add_executable(
     MultiplyComputeShaderHomework
     "homework/Multiply.cpp"
+)
+
+add_executable(
+    ComputeShaderRayTracing
+    "src/ComputeShaderRayTracing/main.cpp"
+    "src/ComputeShaderRayTracing/DataDump.h"
     ${MuVkHeaders}
 )
 

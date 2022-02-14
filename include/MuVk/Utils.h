@@ -3,6 +3,7 @@
 #include <vector>
 #include "CreateInfo.h"
 #include "Query.h"
+#include "FileLoader.h"
 namespace MuVk
 {
 	namespace Utils
@@ -50,7 +51,7 @@ namespace MuVk
 			createInfo.preTransform = support.capabilities.currentTransform;
 			createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 			createInfo.presentMode = presentMode;
-			createInfo.clipped = VK_TRUE;
+			createInfo.clipped = VK_FALSE;
 			createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 			return createInfo;
@@ -63,6 +64,21 @@ namespace MuVk
 			for (const auto& extension : availableExtensions)
 				requiredExtensions.erase(extension.extensionName);
 			return requiredExtensions.empty();
+		}
+
+		inline uint32_t findMemoryType(VkPhysicalDevice physicalDevice, 
+			const VkMemoryRequirements& requirements, VkMemoryPropertyFlags properties)
+		{
+			VkPhysicalDeviceMemoryProperties memProperties = MuVk::Query::physicalDeviceMemoryProperties(physicalDevice);
+			for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+			{
+				if (requirements.memoryTypeBits & (1 << i) &&
+					(memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				{
+					return i;
+				}
+			}
+			throw std::runtime_error("failed to find proper memory type");
 		}
 
 		inline void beginSingleTimeCommand(VkDevice device, VkCommandPool commandPool, VkCommandBuffer& commandBuffer)
@@ -78,13 +94,22 @@ namespace MuVk
 			vkBeginCommandBuffer(commandBuffer, &beginInfo);
 		}
 
-		inline void endSingleTimeCommand(VkDevice device, VkQueue queue, VkCommandPool commandPool, VkCommandBuffer commandBuffer)
+		inline void endSingleTimeCommand(
+			VkDevice device, 
+			VkQueue queue, 
+			VkCommandPool commandPool, 
+			VkCommandBuffer commandBuffer,
+			VkSubmitInfo* pSubmitInfo = nullptr)
 		{
 			vkEndCommandBuffer(commandBuffer);
-			VkSubmitInfo submitInfo = MuVk::submitInfo();
-			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &commandBuffer;
-			vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+			if (!pSubmitInfo)
+			{
+				VkSubmitInfo submitInfo = MuVk::submitInfo();
+				submitInfo.commandBufferCount = 1;
+				submitInfo.pCommandBuffers = &commandBuffer;
+				vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+			}
+			else vkQueueSubmit(queue, 1, pSubmitInfo, VK_NULL_HANDLE);
 			vkQueueWaitIdle(queue);
 			vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 		}
@@ -95,16 +120,59 @@ namespace MuVk
 			VkQueue queue;
 			VkCommandPool commandPool;
 			VkCommandBuffer commandBuffer;
+			VkSubmitInfo submitInfo;
 			SingleTimeCommandGuard(VkDevice device, VkQueue queue, VkCommandPool commandPool)
 				:device(device), queue(queue), commandPool(commandPool)
 			{
 				beginSingleTimeCommand(device, commandPool, commandBuffer);
+				submitInfo = MuVk::submitInfo();
+				submitInfo.commandBufferCount = 1;
+				submitInfo.pCommandBuffers = &commandBuffer;
 			}
 			~SingleTimeCommandGuard()
 			{
-				endSingleTimeCommand(device, queue, commandPool, commandBuffer);
+				endSingleTimeCommand(device, queue, commandPool, commandBuffer, &submitInfo);
 			}
 		};
+
+		inline VkShaderModule createShaderModule(VkDevice device, const std::vector<char>& code)
+		{
+			VkShaderModule shaderModule;
+			VkShaderModuleCreateInfo createInfo = MuVk::shaderModuleCreateInfo();
+			createInfo.codeSize = code.size();
+			createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+			if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+				throw std::runtime_error("fail to create shader module");
+			return shaderModule;
+		}
+
+		inline VkShaderModule createShaderModule(VkDevice device, const std::string& path)
+		{
+			return createShaderModule(device, readFile(path));
+		}
+
+		inline VkImageSubresourceLayers fillImageSubresourceLayers(
+			VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT)
+		{
+			VkImageSubresourceLayers subresource;
+			subresource.aspectMask = aspect;
+			subresource.baseArrayLayer = 0;
+			subresource.layerCount = 1;
+			subresource.mipLevel = 0;
+			return subresource;
+		}
+
+		inline VkImageSubresourceRange fillImageSubresourceRange(
+			VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT)
+		{
+			VkImageSubresourceRange subresourceRange{};
+			subresourceRange.aspectMask = aspect;
+			subresourceRange.baseMipLevel = 0;
+			subresourceRange.baseArrayLayer = 0;
+			subresourceRange.levelCount = 1;
+			subresourceRange.layerCount = 1;
+			return subresourceRange;
+		}
 	}
 }
 

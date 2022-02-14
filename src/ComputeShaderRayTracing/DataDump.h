@@ -12,6 +12,7 @@ class TargetBuffer
 public:
 	size_t width;
 	size_t height;
+	bool gammaCorrectOnOutput = true;
 	TargetBuffer() {};
 
 	TargetBuffer(size_t width, size_t height)
@@ -19,12 +20,14 @@ public:
 	{
 		dump.resize(width * height, glm::vec4(0));
 	}
-	
+
 	friend std::ostream& operator << (std::ostream& out, TargetBuffer& buffer)
 	{
 		out << "P3\n" << buffer.width << ' ' << buffer.height << "\n255\n";
-		for (const auto& pixel : buffer.dump)
+		for (auto pixel : buffer.dump)
 		{
+			pixel.w = 1.0f;
+			if (buffer.gammaCorrectOnOutput) pixel = glm::sqrt(pixel);
 			out << (int)(256 * glm::clamp(pixel.x, 0.0f, 0.999f)) << ' '
 				<< (int)(256 * glm::clamp(pixel.y, 0.0f, 0.999f)) << ' '
 				<< (int)(256 * glm::clamp(pixel.z, 0.0f, 0.999f)) << '\n';
@@ -89,7 +92,9 @@ struct PushConstantData
 {
 	glm::ivec2 screenSize;
 	uint32_t hittableCount;
+	uint32_t sampleStart;
 	uint32_t samples;
+	uint32_t totalSamples;
 	uint32_t maxDepth;
 };
 

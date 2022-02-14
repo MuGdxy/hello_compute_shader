@@ -7,10 +7,11 @@
 #include <chrono>
 #include <vulkan/vk_mem_alloc.h>
 #include <filesystem>
+#include <future>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include "MuVk/MuVK.h"
-
+//#include <vulkan/vulkan.hpp>
 #ifndef MU_SHADER_PATH
 #define MU_SHADER_PATH "./shader/"
 #endif
@@ -33,13 +34,14 @@ public:
 	void GreatScene()
 	{
 		//image
-		const auto aspectRatio = 16.0 / 9.0;
-		const int imageWidth = 800;
+		//const auto aspectRatio = 16.0 / 9.0;
+		const auto aspectRatio = (float)WIDTH / (float)HEIGHT;
+		const int imageWidth = WIDTH;
 		const int imageHeight = static_cast<int>(imageWidth / aspectRatio);
 
 		pushConstantData.screenSize = { imageWidth, imageHeight };
 		pushConstantData.maxDepth = 50;
-		pushConstantData.totalSamples = 800;
+		pushConstantData.totalSamples = 200;
 
 		target = TargetBuffer(imageWidth, imageHeight);
 
@@ -270,14 +272,11 @@ public:
 		createInfo.queueCreateInfoCount = 1;
 		createInfo.pQueueCreateInfos = &queueCreateInfo;
 		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
-		{
 			throw std::runtime_error("failed to create logical device");
-		}
 		vkGetDeviceQueue(device, queueFamilyIndex.value(), 0, &universalQueue);
 	}
 
 	std::array<VkBuffer,5> storageBuffers;
-	
 	std::array <VmaAllocation,5>  storageAllocation;
 	VkBuffer uniformBuffer;
 	VmaAllocation uniformAllocation;
@@ -306,11 +305,12 @@ public:
 
 		vkBindBufferMemory(device, buffer, memory, 0);
 	}
+
 	void createBuffer(VkBufferUsageFlags usage, VkBuffer& buffer, VmaAllocation& allocation)
 	{
 		VkBufferCreateInfo bufferInfo = MuVk::bufferCreateInfo();
 		bufferInfo.size = target.DumpSize();
-		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		bufferInfo.usage = usage;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		bufferInfo.queueFamilyIndexCount = VK_QUEUE_FAMILY_IGNORED;
 		bufferInfo.pQueueFamilyIndices = nullptr;
@@ -335,6 +335,7 @@ public:
 	
 	VkImage storageImage;
 	VmaAllocation storageImageAllocation;
+	VkImageView storageImageView;
 	void createStorageImage()
 	{
 		VkImageCreateInfo imageInfo = MuVk::imageCreateInfo();
@@ -344,19 +345,70 @@ public:
 		imageInfo.extent.depth = 1;
 		imageInfo.mipLevels = 1;
 		imageInfo.arrayLayers = 1;
-		imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
 		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageInfo.mipLevels = 1;
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		imageInfo.flags = 0;
+
 		VmaAllocationCreateInfo allocInfo = {};
 		allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-		vmaCreateImage(allocator, &imageInfo, &allocInfo, &storageImage, &storageImageAllocation, nullptr);
+		if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &storageImage, &storageImageAllocation, nullptr)
+			!= VK_SUCCESS)
+			throw std::runtime_error("failed to create image");
+		
+		transitionImageLayout(storageImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 1);
+
+		VkImageViewCreateInfo viewInfo = MuVk::imageViewCreateInfo();
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.components = {
+			VK_COMPONENT_SWIZZLE_IDENTITY,
+			VK_COMPONENT_SWIZZLE_IDENTITY,
+			VK_COMPONENT_SWIZZLE_IDENTITY,
+			VK_COMPONENT_SWIZZLE_IDENTITY };
+		viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+		viewInfo.image = storageImage;
+		viewInfo.subresourceRange = MuVk::Utils::fillImageSubresourceRange();
+		if (vkCreateImageView(device, &viewInfo, nullptr, &storageImageView)
+			!= VK_SUCCESS)
+			throw std::runtime_error("failed to create image viewer");
 	}
 	
+	void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
+	{
+		MuVk::Utils::SingleTimeCommandGuard guard(device,universalQueue, commandPool);
+		VkImageMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = image;
+
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = mipLevels;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+		VkPipelineStageFlags srcStage;
+		VkPipelineStageFlags dstStage;
+
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+		vkCmdPipelineBarrier(guard.commandBuffer,
+			srcStage, dstStage,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &barrier);
+	}
+
 	uint32_t findMemoryType(const VkMemoryRequirements& requirements, VkMemoryPropertyFlags properties)
 	{
 		VkPhysicalDeviceMemoryProperties memProperties = MuVk::Query::physicalDeviceMemoryProperties(physicalDevice);
@@ -424,12 +476,14 @@ public:
 	void createDescriptorSetLayout()
 	{
 		{
-			std::array<VkDescriptorSetLayoutBinding, 5> bindings;
+			std::array<VkDescriptorSetLayoutBinding, 6> bindings;
 			for (size_t i = 0; i < bindings.size(); i++)
 			{
+
 				bindings[i].binding = i;
 				bindings[i].descriptorCount = 1;
-				bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				if (i <= 4) bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				else bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 				bindings[i].pImmutableSamplers = nullptr;
 				bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 			}
@@ -462,26 +516,14 @@ public:
 				device, &createInfo, nullptr, &descriptorSetLayouts[1]) != VK_SUCCESS)
 				throw std::runtime_error("failed to create descriptorSetLayout");
 		}
-
-	}
-
-	VkShaderModule createShaderModule(const std::vector<char>& code)
-	{
-		VkShaderModule shaderModule;
-		VkShaderModuleCreateInfo createInfo = MuVk::shaderModuleCreateInfo();
-		createInfo.codeSize = code.size();
-		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-		if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-			throw std::runtime_error("fail to create shader module");
-		return shaderModule;
 	}
 
 	VkPipelineLayout pipelineLayout;
 	VkPipeline computePipeline;
 	void createComputePipeline()
 	{
-		auto computeShaderCode = MuVk::readFile(MU_SHADER_PATH "/ray_tracing/ray_tracing.comp.spv");
-		auto computeShaderModule = createShaderModule(computeShaderCode);
+		auto computeShaderModule = MuVk::Utils::createShaderModule(
+			device, MU_SHADER_PATH "/ray_tracing/ray_tracing.comp.spv");
 		VkPipelineShaderStageCreateInfo shaderStageCreateInfo = MuVk::pipelineShaderStageCreateInfo();
 		shaderStageCreateInfo.module = computeShaderModule;
 		shaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -516,12 +558,15 @@ public:
 	VkDescriptorPool descriptorPool;
 	void createDescriptorPool()
 	{
-		std::array<VkDescriptorPoolSize, 2> poolSize;
+		std::array<VkDescriptorPoolSize, 3> poolSize;
 		poolSize[0].descriptorCount = 1 + 2 + 2;
 		poolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
 		poolSize[1].descriptorCount = 1;
-		poolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSize[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+
+		poolSize[2].descriptorCount = 1;
+		poolSize[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
 
 		VkDescriptorPoolCreateInfo createInfo = MuVk::descriptorPoolCreateInfo();
@@ -558,29 +603,45 @@ public:
 		storageBufferInfos[3].range = hittables.HeadSize();
 		storageBufferInfos[4].range = hittables.DumpSize();
 
-		VkDescriptorBufferInfo uniformBufferInfo;
-		uniformBufferInfo.buffer = uniformBuffer;
-		uniformBufferInfo.offset = 0;
-		uniformBufferInfo.range = sizeof(camera);
-
 		VkWriteDescriptorSet write = MuVk::writeDescriptorSet();
-		std::array<VkWriteDescriptorSet, 6> writes;
+		std::array<VkWriteDescriptorSet, 7> writes;
 		writes.fill(write);
 		for (size_t i = 0; i < writes.size() - 1; ++i)
 		{
-			writes[i].descriptorCount = 1;
-			writes[i].dstSet = descriptorSets[0];
-			writes[i].dstArrayElement = 0;
-			writes[i].dstBinding = i;
-			writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			writes[i].pBufferInfo = &storageBufferInfos[i];
+			auto& write = writes[i];
+			write.dstSet = descriptorSets[0];
+			write.dstBinding = i;
+			write.dstArrayElement = 0;
+			write.descriptorCount = 1;
+			if (i < 5)
+			{
+				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				write.pBufferInfo = &storageBufferInfos[i];
+			}
+			else//storage image
+			{
+				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				VkDescriptorImageInfo imageInfo;
+				imageInfo.sampler = nullptr;
+				imageInfo.imageView = storageImageView;
+				imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+				write.pImageInfo = &imageInfo;
+			}
 		}
-		writes[5].descriptorCount = 1;
-		writes[5].dstSet = descriptorSets[1];
-		writes[5].dstArrayElement = 0;
-		writes[5].dstBinding = 0;
-		writes[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		writes[5].pBufferInfo = &uniformBufferInfo;
+		
+		{//camera uniform buffer
+			auto& write = writes[6];
+			write.descriptorCount = 1;
+			write.dstSet = descriptorSets[1];
+			write.dstArrayElement = 0;
+			write.dstBinding = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			VkDescriptorBufferInfo uniformBufferInfo;
+			uniformBufferInfo.buffer = uniformBuffer;
+			uniformBufferInfo.offset = 0;
+			uniformBufferInfo.range = sizeof(camera);
+			write.pBufferInfo = &uniformBufferInfo;
+		}
 		
 		vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
 	}
@@ -590,6 +651,7 @@ public:
 	{
 		VkCommandPoolCreateInfo createInfo = MuVk::commandPoolCreateInfo();
 		createInfo.queueFamilyIndex = queueFamilyIndex.value();
+		createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		if (vkCreateCommandPool(device, &createInfo, nullptr, &commandPool)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to create command pool!");
@@ -610,6 +672,7 @@ public:
 
 	void execute(uint32_t sampleStart, uint32_t samples)
 	{
+		vkResetCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
 		auto start = std::chrono::high_resolution_clock::now();
 		VkCommandBufferBeginInfo beginInfo = MuVk::commandBufferBeginInfo();
 		vkBeginCommandBuffer(commandBuffer, &beginInfo);
@@ -673,23 +736,45 @@ public:
 				break;
 			}
 		}
+		transitionImageLayout(storageImage,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 1);
+	}
+
+	void output()
+	{
 		ReadMemory(storageAllocation[0], target.dump.data(), target.DumpSize());
-		//void* data;
-		//vkMapMemory(device, storageBufferMemorys[0], 0, target.DumpSize(), 0, &data);
-		//memcpy(target.dump.data(), data, target.DumpSize());
-		//vkUnmapMemory(device, storageBufferMemorys[0]);
 		std::filesystem::path out("./RenderingTarget.ppm");
 		auto absPath = std::filesystem::absolute(out);
+		std::cout << "Output Path:" << absPath << std::endl;
+		bool finish = false;
+		std::future<void> f = std::async([&finish]()
+			{
+				std::cout << "Wait:\n";
+				while (!finish)
+				{
+					std::chrono::duration<double, std::milli> time(500);
+					for (auto i = 0; i < 3; ++i)
+					{
+						std::this_thread::sleep_for(time);
+						switch (i)
+						{
+						case 0: std::cout << "\r/" << std::flush; break;
+						case 1: std::cout << "\r-" << std::flush; break;
+						case 2: std::cout << "\r\\" << std::flush; break;
+						default:
+							break;
+						}
+					}
+				}
+			});
 		std::ofstream os(out);
 		os << target;
-		std::cout << "Output Path:" << absPath << std::endl;
+		finish = true;
 	}
 
 	GLFWwindow* window;
-	int WIDTH = 800;
-	int HEIGHT = 600;
-
-
+	uint32_t WIDTH = 1600;
+	uint32_t HEIGHT = 900;
 
 	void createWindow()
 	{
@@ -709,6 +794,7 @@ public:
 
 	VkSwapchainKHR swapchain;
 	std::vector<VkImage> swapchainImages;
+	std::vector<bool> finish;
 	void createSwapchain()
 	{
 		auto support = MuVk::Query::querySwapChainSupport(physicalDevice, surface);
@@ -717,22 +803,84 @@ public:
 		auto createInfo = MuVk::Utils::fillSwapchainCreateInfo(support, surface, { (uint32_t)width, (uint32_t)height });
 		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		createInfo.queueFamilyIndexCount = VK_QUEUE_FAMILY_IGNORED;
+		createInfo.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to create swapchain!");
 
 		swapchainImages = MuVk::Utils::getSwapchainImages(device, swapchain);
+		finish.resize(swapchainImages.size(), false);
 	}
 
+	std::vector<VkSemaphore> availableSema;
+	//std::vector<VkFence> availableFence;
+	std::vector<VkFence> inFlightFence;
+	void createSyncObj()
+	{
+		availableSema.resize(MAX_IN_FLIGHT);
+		inFlightFence.resize(MAX_IN_FLIGHT);
+		//availableFence.resize(swapchainImages.size());
+		VkSemaphoreCreateInfo semaInfo = MuVk::semaphoreCreateInfo();
+		VkFenceCreateInfo fenceInfo = MuVk::fenceCreateInfo();
+		//fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		for (size_t i = 0; i < MAX_IN_FLIGHT; i++)
+		{
+			vkCreateSemaphore(device, &semaInfo, nullptr, &availableSema[i]);
+			vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence[i]);
+		} 
+		//for (size_t i = 0; i < swapchainImages.size(); i++)
+		//{
+		//	vkCreateFence(device, &fenceInfo, nullptr, &availableFence[i]);
+		//}
+	}
+
+	const int MAX_IN_FLIGHT = 2;
+	int currentFrame = 0;
 	void drawFrame()
 	{
 		uint32_t imageIndex;
-		vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, nullptr, nullptr, &imageIndex);
+		auto result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+			nullptr,
+			inFlightFence[currentFrame], &imageIndex);
+		if (result != VK_SUCCESS) return;
+
+		vkWaitForFences(device, 1, &inFlightFence[currentFrame], true, UINT64_MAX);
+
+		if(!finish[imageIndex])
 		{
-			MuVk::Utils::SingleTimeCommandGuard guard(device, universalQueue, commandPool);
-			//vkCmdCopyImage(guard.commandBuffer, storageImage,)
+			transitionImageLayout(swapchainImages[imageIndex],
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1);
+
+			{
+				MuVk::Utils::SingleTimeCommandGuard guard(device, universalQueue, commandPool);
+				VkImageCopy copy;
+				copy.srcOffset = { 0,0,0 };
+				copy.srcSubresource = MuVk::Utils::fillImageSubresourceLayers();
+				copy.extent = { WIDTH,HEIGHT,1 };
+				copy.dstOffset = { 0, 0, 0 };
+				copy.dstSubresource = MuVk::Utils::fillImageSubresourceLayers();
+				vkCmdCopyImage(guard.commandBuffer,
+					storageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					swapchainImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					1, &copy);
+			}
+
+			transitionImageLayout(swapchainImages[imageIndex],
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1);
+			finish[imageIndex] = true;
 		}
+		
+
+
+		VkPresentInfoKHR info = MuVk::presentInfoKHR();
+		info.pImageIndices = &imageIndex;
+		info.pResults = nullptr;
+		info.pSwapchains = &swapchain;
+		info.swapchainCount = 1;
+		vkQueuePresentKHR(universalQueue, &info);
+		currentFrame = (currentFrame + 1) % MAX_IN_FLIGHT;
+		vkResetFences(device, 1, &inFlightFence[currentFrame]);
 	}
 
 	void mainloop()
@@ -743,6 +891,7 @@ public:
 			drawFrame();
 		}
 		vkDeviceWaitIdle(device);
+		glfwHideWindow(window);
 	}
 
 	void Run()
@@ -757,22 +906,31 @@ public:
 		createAllocator();
 		//SetupScene();
 		
+		createCommandPool();
 		createBuffers();
+		createStorageImage();
 		writeMemoryFromHost();
 		createDescriptorSetLayout();
 		createComputePipeline();
 
 		createDescriptorPool();
 		createDescriptorSet();
-		createCommandPool();
-
+		
 		execute();
-
+		createSyncObj();
+		mainloop();
+		output();
 		cleanUp();
     }
 
 	void cleanUp()
 	{
+		for (size_t i = 0; i < MAX_IN_FLIGHT; i++)
+		{
+			vkDestroySemaphore(device, availableSema[i], nullptr);
+			vkDestroyFence(device, inFlightFence[i], nullptr);
+		}
+		vkDestroySwapchainKHR(device, swapchain, nullptr);
 		vkDestroyCommandPool(device, commandPool, nullptr);
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 		vkDestroyPipeline(device, computePipeline, nullptr);
@@ -789,6 +947,9 @@ public:
 		}
 		vmaDestroyBuffer(allocator, uniformBuffer, nullptr);
 		vmaFreeMemory(allocator, uniformAllocation);
+		vkDestroyImageView(device, storageImageView, nullptr);
+		vkDestroyImage(device, storageImage, nullptr);
+		vmaFreeMemory(allocator, storageImageAllocation);
 		//vkDestroyBuffer(device, uniformBuffer, nullptr);
 		//vkFreeMemory(device, uniformBufferMemory, nullptr);
 		vmaDestroyAllocator(allocator);
@@ -819,14 +980,14 @@ public:
 int main()
 {
 	ComputeShaderExample program;
-	program.Run();
 	try
 	{
-		
+		program.Run();
 	}
-	catch (std::runtime_error)
+	catch (std::runtime_error e)
 	{
-		//program.cleanUp();
+		std::cerr << e.what() << std::flush;
+		program.cleanUp();
 	}
 
 }
