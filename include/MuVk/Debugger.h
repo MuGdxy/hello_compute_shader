@@ -3,7 +3,9 @@
 #include "Proxy.h"
 #include <iostream>
 #include <stdexcept>
-
+#include <assert.h>
+#define MU_ASSERT(x,info) assert(x)
+#define MU_FATAL_ERROR(info) assert(false)
 namespace MuVk
 {
 	const std::vector validationLayers =
@@ -17,10 +19,10 @@ namespace MuVk
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData)
 	{
-		if (messageSeverity >= VkDebugUtilsMessageSeverityFlagBitsEXT::VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		if (messageSeverity >= VkDebugUtilsMessageSeverityFlagBitsEXT::VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 		{
-			std::cerr << "validation layer:\n\t" << pCallbackData->pMessage << "\n" << std::endl;
-			__debugbreak();
+			std::cerr << "validation layer:\n\t" << pCallbackData->pMessage << "\n" << std::flush;
+			MU_FATAL_ERROR("fatal error, check in log");
 		}
 		//if(messageType == VK_DEBUG_REPORT_INFORMATION_BIT_EXT)
 		//{

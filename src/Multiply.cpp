@@ -33,22 +33,29 @@ public:
 
 		VkInstanceCreateInfo instanceCreateInfo = MuVk::instanceCreateInfo();
 		instanceCreateInfo.pApplicationInfo = &appInfo;
-		instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(MuVk::validationLayers.size());
-		instanceCreateInfo.ppEnabledLayerNames = MuVk::validationLayers.data();
+		const std::vector validationLayers = 
+		{ 
+			"VK_LAYER_KHRONOS_validation" 
+		};
+		instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
 
 		if (!MuVk::checkValidationLayerSupport())
 			throw std::runtime_error("validation layers requested, but not available!");
 
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = MuVk::populateDebugMessengerCreateInfo();
 		//to debug instance
-		instanceCreateInfo.pNext = &debugCreateInfo;
+		//instanceCreateInfo.pNext = &debugCreateInfo;
 
 		//get extension properties
 		auto extensionProperties = MuVk::Query::instanceExtensionProperties();
 		std::cout << extensionProperties << std::endl;
 
 		//required extension
-		std::vector<const char*> extensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
+		const std::vector extensions = 
+		{ 
+			VK_EXT_DEBUG_UTILS_EXTENSION_NAME 
+		};
 		instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 		instanceCreateInfo.ppEnabledExtensionNames = extensions.data();
 
@@ -56,14 +63,14 @@ public:
 		if (result != VkResult::VK_SUCCESS)
 			throw std::runtime_error("failed to create instance");
 
-		if (MuVk::Proxy::CreateDebugUtilsMessengerEXT(
+		if (MuVk::Proxy::createDebugUtilsMessengerEXT(
 			instance, &debugCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS)
 			throw std::runtime_error("failed to setup debug messenger");
 	}
 
 	VkPhysicalDevice physicalDevice;
 
-	std::optional<uint32_t> computeTransferQueueFamilyIndex;
+	std::optional<uint32_t> queueFamilyIndex;
 
 	void pickPhyscialDevice()
 	{
@@ -71,32 +78,31 @@ public:
 		std::cout << physicalDevices << std::endl;
 		for (const auto device : physicalDevices)
 		{
-			auto queueFamilies = MuVk::Query::queueFamilies(device);
+			auto queueFamilies = MuVk::Query::physicalDeviceQueueFamilyProperties(device);
 			std::cout << queueFamilies << std::endl;
 			for (size_t i = 0; i < queueFamilies.size(); ++i)
 			{
-				if (queueFamilies[i].queueFlags & (VK_QUEUE_COMPUTE_BIT) &&
-					queueFamilies[i].queueFlags & (VK_QUEUE_TRANSFER_BIT))
+				if (queueFamilies[i].queueFlags & (VK_QUEUE_COMPUTE_BIT))
 				{
-					computeTransferQueueFamilyIndex = i;
+					queueFamilyIndex = i;
 					physicalDevice = device;
 					break;
 				}
 			}
-			if (computeTransferQueueFamilyIndex.has_value()) break;
+			if (queueFamilyIndex.has_value()) break;
 		}
-		if (!computeTransferQueueFamilyIndex.has_value())
-			throw std::runtime_error("can't find a family that contains compute&transfer queue!");
+		if (!queueFamilyIndex.has_value())
+			throw std::runtime_error("can't find a family that contains compute queue!");
 		else
 		{
 			std::cout << "Select Physical Device:" << physicalDevice << std::endl;
-			std::cout << MuVk::Query::DeviceExtensionProperties(physicalDevice, nullptr) << std::endl;
-			std::cout << "Select Queue Index:" << computeTransferQueueFamilyIndex.value() << std::endl;
+			std::cout << MuVk::Query::deviceExtensionProperties(physicalDevice) << std::endl;
+			std::cout << "Select Queue Index:" << queueFamilyIndex.value() << std::endl;
 		}
 	}
 
 	VkDevice device;
-	VkQueue computeTransferQueue;
+	VkQueue queue;
 	void createLogicalDevice()
 	{
 		VkDeviceCreateInfo createInfo = MuVk::deviceCreateInfo();
@@ -110,7 +116,7 @@ public:
 		VkDeviceQueueCreateInfo queueCreateInfo = MuVk::deviceQueueCreateInfo();
 		queueCreateInfo.queueCount = 1;
 		queueCreateInfo.pQueuePriorities = &priority;
-		queueCreateInfo.queueFamilyIndex = computeTransferQueueFamilyIndex.value();
+		queueCreateInfo.queueFamilyIndex = queueFamilyIndex.value();
 
 		createInfo.queueCreateInfoCount = 1;
 		createInfo.pQueueCreateInfos = &queueCreateInfo;
@@ -119,7 +125,7 @@ public:
 			throw std::runtime_error("failed to create logical device");
 		}
 
-		vkGetDeviceQueue(device, computeTransferQueueFamilyIndex.value(), 0, &computeTransferQueue);
+		vkGetDeviceQueue(device, queueFamilyIndex.value(), 0, &queue);
 	}
 
 	VkBuffer storageBuffer;
@@ -281,7 +287,7 @@ public:
 	void createCommandPool()
 	{
 		VkCommandPoolCreateInfo createInfo = MuVk::commandPoolCreateInfo();
-		createInfo.queueFamilyIndex = computeTransferQueueFamilyIndex.value();
+		createInfo.queueFamilyIndex = queueFamilyIndex.value();
 		if (vkCreateCommandPool(device, &createInfo, nullptr, &commandPool)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to create command pool!");
@@ -321,12 +327,12 @@ public:
 		submitInfo.pCommandBuffers = &commandBuffer;
 		submitInfo.waitSemaphoreCount = 0;
 		submitInfo.signalSemaphoreCount = 0;
-		if (vkQueueSubmit(computeTransferQueue, 1, &submitInfo, VK_NULL_HANDLE)
+		if (vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE)
 			!= VK_SUCCESS)
 			throw std::runtime_error("failed to submit command buffer!");
 
 		//wait the calculation to finish
-		if (vkQueueWaitIdle(computeTransferQueue) != VK_SUCCESS)
+		if (vkQueueWaitIdle(queue) != VK_SUCCESS)
 			throw std::runtime_error("failed to wait queue idle!");
 		void* data;
 		vkMapMemory(device, storageBufferMemory, 0, inputDataSize(), 0, &data);
@@ -338,6 +344,7 @@ public:
 			if (i % 64 == 0 && i != 0) std::cout << '\n';
 			std::cout << outputData[i];
 		}
+		std::cout << '\n';
 	}
 
 	void Run()
@@ -370,7 +377,7 @@ public:
 		vkDestroyBuffer(device, storageBuffer, nullptr);
 		vkFreeMemory(device, storageBufferMemory, nullptr);
 
-		MuVk::Proxy::DestoryDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+		MuVk::Proxy::destoryDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		vkDestroyDevice(device, nullptr);
 		vkDestroyInstance(instance, nullptr);
 	}
@@ -379,6 +386,14 @@ public:
 int main()
 {
     ComputeShaderExample program;
-    program.Run();
+	try
+	{
+		program.Run();
+	}
+	catch (std::runtime_error e)
+	{
+		std::cerr << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
 }
 

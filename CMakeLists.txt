@@ -30,35 +30,6 @@ add_executable(
     ${MuVkHeaders}
 )
 
-# add_executable(
-#     ViewID
-#     "src/ViewID.cpp"
-#     ${MuVkHeaders}
-# )
-
-# add_executable(
-#     PhysicalDeviceProperties
-#     "src/PhysicalDeviceProperties.cpp"
-#     ${MuVkHeaders}
-# )
-
-# add_executable(
-#     ComputeShaderRayTracing
-#     "src/ComputeShaderRayTracing/main.cpp"
-#     "src/ComputeShaderRayTracing/DataDump.h"
-#     ${MuVkHeaders}
-# )
-
-add_executable(
-    CSRT-vma
-    "src/CSRT-vma/main.cpp"
-    "src/CSRT-vma/DataDump.h"
-    "src/CSRT-vma/testVma.cpp"
-    "src/VmaUsage.cpp"
-    ${MuVkHeaders}
-)
-target_link_libraries(CSRT-vma glfw3.lib)
-
 
 
 
