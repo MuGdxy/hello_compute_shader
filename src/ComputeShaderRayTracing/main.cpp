@@ -31,6 +31,7 @@ public:
 	uint32_t WIDTH = 800;
 	uint32_t HEIGHT = 600;
 
+	//create a lovely pink scene
 	void GreatScene()
 	{
 		//image
@@ -130,6 +131,7 @@ public:
 			}
 		}
 
+		//create materials
 		auto material1 = materials.Allocate<Dielectric>(1.5);
 		hittables.Allocate<Sphere>(point3(0, 1, 0), 1.0)->mat = material1;
 
@@ -138,15 +140,14 @@ public:
 
 		auto material3 = materials.Allocate<Metal>(color(253.0 / 255.0, 236.0 / 255.0, 223.0 / 255.0), 0.0);
 		hittables.Allocate<Sphere>(point3(4, 1, 0), 1.0)->mat = material3;
+		
 		// Camera
 		point3 lookfrom(13, 2, 3);
 		point3 lookat(0, 0, 0);
 		vec3 vup(0, 1, 0);
 		auto distTofocus = 10.0;
 		auto aperture = 0;
-
 		camera = Camera(lookfrom, lookat, vup, 30, aspectRatio, aperture, distTofocus);
-
 
 		pushConstantData.hittableCount = hittables.Count();
 	}
@@ -228,6 +229,13 @@ public:
 		auto p = MuVk::Query::physicalDeviceProperties(physicalDevice);
 		std::cout << "maxComputeWorkGroupInvocations:" << p.limits.maxComputeWorkGroupInvocations << std::endl;
 		computeShaderProcessUnit = sqrt(p.limits.maxComputeWorkGroupInvocations);
+
+		if (computeShaderProcessUnit != 32)
+		{
+			std::cerr << "[Problem Code 001] please read hello_compute_shader/Problems.md to solve the problem!\n" << std::flush;
+			std::cerr << "your <computeShaderProcessUnit> =" << computeShaderProcessUnit << "\n" << std::flush;
+			throw std::runtime_error("please make some modification to run this!");
+		}
 	}
 
 	VkDevice device;
@@ -290,9 +298,7 @@ public:
 	void createBuffers()
 	{
 		for (size_t i = 0; i < storageBuffers.size(); i++)
-		{
 			createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, storageBuffers[i], storageBufferMemorys[i]);
-		}
 		createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, uniformBuffer, uniformBufferMemory);
 	}
 
@@ -399,7 +405,7 @@ public:
 	VkPipeline computePipeline;
 	void createComputePipeline()
 	{
-		auto computeShaderCode = MuVk::readFile(MU_SHADER_PATH "/ray_tracing/ray_tracing_no_image.comp.spv");
+		auto computeShaderCode = MuVk::readFile(MU_SHADER_PATH "/ray_tracing/ray_tracing_basic.comp.spv");
 		auto computeShaderModule = createShaderModule(computeShaderCode);
 		VkPipelineShaderStageCreateInfo shaderStageCreateInfo = MuVk::pipelineShaderStageCreateInfo();
 		shaderStageCreateInfo.module = computeShaderModule;
@@ -485,6 +491,7 @@ public:
 		VkWriteDescriptorSet write = MuVk::writeDescriptorSet();
 		std::array<VkWriteDescriptorSet, 6> writes;
 		writes.fill(write);
+		//for storage buffers
 		for (size_t i = 0; i < writes.size() - 1; ++i)
 		{
 			writes[i].descriptorCount = 1;
@@ -494,6 +501,7 @@ public:
 			writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 			writes[i].pBufferInfo = &storageBufferInfos[i];
 		}
+		//for camera uniform buffer
 		writes[5].descriptorCount = 1;
 		writes[5].dstSet = descriptorSets[1];
 		writes[5].dstArrayElement = 0;
@@ -595,16 +603,16 @@ public:
 		}
 	}
 
+	bool finish = false;
 	void output()
 	{
 		ReadMemory(storageBufferMemorys[0], target.dump.data(), target.DumpSize());
 		std::filesystem::path out("./RenderingTarget.ppm");
 		auto absPath = std::filesystem::absolute(out);
 		std::cout << "Output Path:" << absPath << std::endl;
-		bool finish = false;
-		std::future<void> f = std::async([&finish]()
+		std::cout << "Wait:\n";
+		std::future<void> f = std::async([this]()
 			{
-				std::cout << "Wait:\n";
 				while (!finish)
 				{
 					std::chrono::duration<double, std::milli> time(500);
@@ -625,6 +633,8 @@ public:
 		std::ofstream os(out);
 		os << target;
 		finish = true;
+		f.wait();
+		std::cout << "\nOutput Finished!\n";
 	}
 
 	void Run()
@@ -632,7 +642,6 @@ public:
 		createInstance();
 		pickPhyscialDevice();
 		createLogicalDevice();
-		//SetupScene();
 		GreatScene();
 
 		createBuffers();
@@ -680,9 +689,10 @@ int main()
 	{
 		program.Run();
 	}
-	catch (std::runtime_error)
+	catch (std::runtime_error e)
 	{
-		program.cleanUp();
+		std::cerr << e.what() << std::endl;
+		return EXIT_FAILURE;
 	}
 
 }
