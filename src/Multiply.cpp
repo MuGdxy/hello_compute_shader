@@ -12,7 +12,7 @@ class ComputeShaderExample
 	std::array<float, 1024> inputData;
 	std::array<float, 1024> outputData;
 	constexpr VkDeviceSize inputDataSize() { return sizeof(inputData); }
-	constexpr uint32_t computeShaderProcessUnit() { return 256; }
+	uint32_t computeShaderProcessUnit;
 public:
 	ComputeShaderExample()
 	{
@@ -99,6 +99,9 @@ public:
 			std::cout << MuVk::Query::deviceExtensionProperties(physicalDevice) << std::endl;
 			std::cout << "Select Queue Index:" << queueFamilyIndex.value() << std::endl;
 		}
+		auto p = MuVk::Query::physicalDeviceProperties(physicalDevice);
+		std::cout << "maxComputeWorkGroupInvocations:" << p.limits.maxComputeWorkGroupInvocations << std::endl;
+		computeShaderProcessUnit = std::min(p.limits.maxComputeWorkGroupInvocations, uint32_t(256));
 	}
 
 	VkDevice device;
@@ -218,7 +221,7 @@ public:
 		shaderStageCreateInfo.module = computeShaderModule;
 		shaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 		shaderStageCreateInfo.pName = "main";
-
+		
 		VkPipelineLayoutCreateInfo layoutCreateInfo = MuVk::pipelineLayoutCreateInfo();
 		layoutCreateInfo.setLayoutCount = 1;
 		layoutCreateInfo.pSetLayouts = &descriptorSetLayout;
@@ -317,7 +320,7 @@ public:
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
 			0, 1, &descriptorSet, 0, nullptr);
 		vkCmdDispatch(commandBuffer, 
-			static_cast<uint32_t>(inputData.size() / computeShaderProcessUnit()), //x
+			static_cast<uint32_t>(inputData.size() / computeShaderProcessUnit), //x
 			1, //y
 			1  //z
 		);

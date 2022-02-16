@@ -229,13 +229,6 @@ public:
 		auto p = MuVk::Query::physicalDeviceProperties(physicalDevice);
 		std::cout << "maxComputeWorkGroupInvocations:" << p.limits.maxComputeWorkGroupInvocations << std::endl;
 		computeShaderProcessUnit = sqrt(p.limits.maxComputeWorkGroupInvocations);
-
-		if (computeShaderProcessUnit != 32)
-		{
-			std::cerr << "[Problem Code 001] please read hello_compute_shader/Problems.md to solve the problem!\n" << std::flush;
-			std::cerr << "your <computeShaderProcessUnit> =" << computeShaderProcessUnit << "\n" << std::flush;
-			throw std::runtime_error("please make some modification to run this!");
-		}
 	}
 
 	VkDevice device;
@@ -411,6 +404,18 @@ public:
 		shaderStageCreateInfo.module = computeShaderModule;
 		shaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 		shaderStageCreateInfo.pName = "main";
+
+		VkSpecializationMapEntry entry{};
+		entry.constantID = 0;
+		entry.offset = 0;
+		entry.size = sizeof(uint32_t);
+
+		VkSpecializationInfo specInfo{};
+		specInfo.mapEntryCount = 1;
+		specInfo.pMapEntries = &entry;
+		specInfo.pData = &computeShaderProcessUnit;
+		specInfo.dataSize = sizeof(computeShaderProcessUnit);
+		shaderStageCreateInfo.pSpecializationInfo = &specInfo;
 
 		VkPushConstantRange range{};
 		range.offset = 0;

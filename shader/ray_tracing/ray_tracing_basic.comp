@@ -11,6 +11,7 @@
 const int blockSizeX = 32;
 const int blockSizeY = 32;
 layout (local_size_x = blockSizeX, local_size_y = blockSizeY) in;
+layout (local_size_x_id = 0, local_size_y_id =  0) in;
 
 layout(push_constant, std430) uniform PushConstant 
 {
